@@ -13,7 +13,7 @@ input_width: 256
 train_epoch : 100
 save_every_epoch : 5
 # change the batchsize
-batch_size: 1 # 32
+batch_size: 2 # 32
 print_freq : 100
 last_iter : -1 
 augment: True

@@ -26,8 +26,8 @@ def cleanup():
 
 def start(rank, world_size, args):
     print(rank, '/', world_size)
-    setup(rank,world_size)
-    init_logging('global', logging.INFO,args.logname,rank)
+    setup(rank, world_size)
+    init_logging('global', logging.INFO, args.logname, rank)
     logger = logging.getLogger('global')
 
     torch.cuda.is_available()
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true')
     parser.add_argument('-t', '--tocaffe', dest='tocaffe', action='store_true')
     parser.add_argument('-onnx', '--toonnx', dest='toonnx', action='store_true')
-    parser.add_argument('--world_size',dest='world_size',default=1) # 单线程
+    parser.add_argument('--world_size',dest='world_size', type=int, default=1) # 单线程
     parser.add_argument('--logname',dest='logname',default='train_jzw.log')
 
     args = parser.parse_args()
