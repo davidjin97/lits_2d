@@ -98,10 +98,11 @@ class SegTrainer(object):
 
     def _prepare_dataset(self):
         if not self.opt.evaluate:
-            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image/*')
-            mask_paths = glob('/home/jzw/data/LiTS/LITS17/train_mask/*')
-            img_paths = img_paths[:20]
-            mask_paths = mask_paths[:20]
+            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image3d_jzw/*')
+            mask_paths = glob('/home/jzw/data/LiTS/LITS17/train_mask3d_jzw/*')
+            if self.opt.debug:
+                img_paths = img_paths[:20]
+                mask_paths = mask_paths[:20]
             train_img_paths, val_img_paths, train_mask_paths, val_mask_paths = \
                 train_test_split(img_paths, mask_paths, test_size=0.4, random_state=self.opt.manualSeed)
                 # train_test_split(img_paths, mask_paths, test_size=0.3, random_state=19)
@@ -188,7 +189,7 @@ class SegTrainer(object):
         for epoch in range(self.opt.train_epoch):
             epoch_iters = len(self.train_loader)
             for iter_train, (image, mask) in enumerate(self.train_loader):
-                # print(image.shape, mask.shape) # torch.Size([1, 1, 64, 128, 160]) torch.Size([1, 2, 64, 128, 160])
+                # print(image.shape, mask.shape) # torch.Size([b, 1, 64, 128, 160]) torch.Size([b, 2, 64, 128, 160])
                 image = image.to(self.opt.rank)
                 mask = mask.to(self.opt.rank)
                 output = self.net(image) 

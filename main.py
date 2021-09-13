@@ -25,7 +25,6 @@ def cleanup():
     dist.destroy_process_group()
 
 def start(rank, world_size, args):
-    print(rank, '/', world_size)
     setup(rank, world_size)
     init_logging('global', logging.INFO, args.logname, rank)
     logger = logging.getLogger('global')
@@ -53,6 +52,7 @@ def start(rank, world_size, args):
     config.world_size = world_size
 
     config['stride'] = 64
+    config.debug = args.debug
     logger.info("Running with config:\n{}".format(format_cfg(config)))
 
     trainer = SegTrainer(config)
@@ -78,6 +78,7 @@ if __name__ == '__main__':
     parser.add_argument('-onnx', '--toonnx', dest='toonnx', action='store_true')
     parser.add_argument('--world_size',dest='world_size', type=int, default=1) # 单线程
     parser.add_argument('--logname',dest='logname',default='train_jzw.log')
+    parser.add_argument('--debug', action='store_true')
 
     args = parser.parse_args()
     assert (os.path.exists(args.config))
