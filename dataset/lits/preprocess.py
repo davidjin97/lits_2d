@@ -177,14 +177,28 @@ if __name__ == '__main__':
     ### 3d images
     # savedct_path = '/home/jzw/data/LiTS/LITS17/train_image3d_jzw/*'
     # savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask3d_jzw/*'
-    savedct_path = '/home/jzw/data/LiTS/LITS17/train_image3d/*'
-    savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask3d/*'
+    # savedct_path = '/home/jzw/data/LiTS/LITS17/train_image3d/*'
+    # savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask3d/*'
     ### 2d images
-    # savedct_path = '/home/jzw/data/LiTS/LITS17/train_image2d/*'
-    # savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask2d/*'
+    savedct_path = '/home/jzw/data/LiTS/LITS17/train_image2d/*' # (448, 448, 3)
+    savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask2d/*'
     from glob import glob
     ct_paths = glob(savedct_path)
+    seg_paths = glob(savedseg_path)
     print(len(ct_paths))
-    for path in ct_paths[:20]:
+    print(len(seg_paths))
+    print(ct_paths[:3])
+    ct_paths = ['/home/jzw/data/LiTS/LITS17/train_image2d/6_180.npy', '/home/jzw/data/LiTS/LITS17/train_image2d/6_181.npy', '/home/jzw/data/LiTS/LITS17/train_image2d/6_182.npy']
+    for path in ct_paths[:3]:
         x = np.load(path) 
         print(type(x), x.shape)
+        x0 = x[:, :, 0]
+        x1 = x[:, :, 1]
+        x2 = x[:, :, 2]
+        print("x0: ", x0.sum())
+        print("x1: ", x1.sum())
+        print("x2: ", x2.sum())
+        # print(x0[100:120, 100:120])
+        # print(x1[100:120, 100:120])
+        # print(x2[100:120, 100:120])
+        print('-'*20)
