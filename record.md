@@ -25,3 +25,10 @@ pid = 23139
 执行352 * 352数据切割
 nohup python preprocess_2d_jzw.py > preprocess_2d_jzw_352.log 2>&1 &
 pid = 20692
+
+Q: loss is negative?
+A: use `sigmoid` at the end of model.
+
+run lits_352*353 by UNet
+nohup bash run.sh > train_lits_unet.out 2>&1 &
+pid = 34517

@@ -57,10 +57,9 @@ class SegTrainer(object):
     def initialize(self):
         self._build_net()
         self._get_parameter_number()
-        if not self.opt.tocaffe or not self.opt.toonnx:
-            self._prepare_dataset()
-            if not self.opt.evaluate:
-                self._build_optimizer()
+        self._prepare_dataset()
+        if not self.opt.evaluate:
+            self._build_optimizer()
     
     def _build_net(self):
         self.net = build_net(self.opt.net_name)(**self.opt.model).to(self.opt.rank)
@@ -77,8 +76,7 @@ class SegTrainer(object):
                 self.net = self.net.apply(freeze_bn)
 
         # 使用DDP       
-        if not self.opt.tocaffe or not self.opt.toonnx:
-            self.net = DDP(self.net,device_ids=[self.opt.rank])
+        self.net = DDP(self.net,device_ids=[self.opt.rank])
 
         if self.opt.evaluate:
             self.load_state_keywise(self.opt.resume_model)
@@ -178,7 +176,7 @@ class SegTrainer(object):
         if self.opt.rank == 0:
             if not self.opt.log_directory:
                 self.opt.log_directory = os.makedirs(self.opt.log_directory)
-            writer = SummaryWriter(self.opt.log_directory)
+            self.writer = SummaryWriter(self.opt.log_directory)
 
         train_start_time = time.time()
         losses = AverageMeter()
@@ -206,8 +204,8 @@ class SegTrainer(object):
                 self.optimizer.step()
                 logger.info(f'Training Epoch: {epoch+1}/{self.opt.train_epoch},iter: {iter_train+1}/{epoch_iters}, the loss is {loss.item()}')
                 if self.opt.rank == 0:
-                    writer.add_scalar(f'Loss/train_iter', loss.item(), iter_train + epoch * len(self.train_loader))
-            self.lr_scheduler.step()
+                    self.writer.add_scalar(f'Loss/train_iter', loss.item(), iter_train + epoch * len(self.train_loader))
+            # self.lr_scheduler.step()
 
             logger.info(f'Start evalute at Epoch: {epoch+1}/{self.opt.train_epoch}')
             self.val(epoch)
@@ -222,7 +220,7 @@ class SegTrainer(object):
 
     def val(self, epoch):
         self.net.eval()
-        val_losses = AverageMeter()
+        losses = AverageMeter()
         # ious = AverageMeter()
         # dices_1s = AverageMeter()
         # dices_2s = AverageMeter()
@@ -239,7 +237,7 @@ class SegTrainer(object):
 
                 logger.info(f'Val iter: {iter_val+1}/{val_iters}, the loss is {loss.item()}')
                 if self.opt.rank == 0:
-                    writer.add_scalar(f'Loss/val_iter', loss.item(), iter_val+ epoch * len(self.val_loader))
+                    self.writer.add_scalar(f'Loss/val_iter', loss.item(), iter_val+ epoch * len(self.val_loader))
 
         # log = OrderedDict([
         #     ('loss', losses.avg),

@@ -46,11 +46,8 @@ def start(rank, world_size, args):
 
     #是否需要转模型
     config['evaluate'] = args.evaluate
-    config['tocaffe'] = args.tocaffe
-    config['toonnx'] = args.toonnx
     config.rank = rank
     config.world_size = world_size
-
     config['stride'] = 64
     config.debug = args.debug
     logger.info("Running with config:\n{}".format(format_cfg(config)))

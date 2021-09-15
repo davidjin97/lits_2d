@@ -67,9 +67,10 @@ class OutConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(OutConv, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        return self.conv(x)
+        return self.sigmoid(self.conv(x))
 
 class UNet(nn.Module):
     def __init__(self, in_channels, out_channels, bilinear=True):
@@ -117,6 +118,9 @@ if __name__ == "__main__":
         model = torch.nn.DataParallel(model, device_ids=device_ids)
 
     # input = torch.randn((2, 1, 64, 128, 160)).to(device) # BCDHW
-    input = torch.randn(4, 1, 224, 224).to(device) # BCHW 
+    input = torch.randn(4, 1, 352, 352).to(device) # BCHW 
     output = model(input)
-    print("input.shape:", input.shape, "output.shape:", output.shape) # 2, 2, 32, 64, 64
+
+    print("input.shape: ", input.shape)
+    print("output.shape: ", output.shape) # 2, 2, 32, 64, 64
+    print(f"min: {output.min()}, max: {output.max()}")
