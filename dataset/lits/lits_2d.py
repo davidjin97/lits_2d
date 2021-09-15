@@ -210,10 +210,10 @@ if __name__ == '__main__':
         assert 1>3
     """
     args = {}
-    # img_root = Path("/home/jzw/data/LiTS/LITS17/train_image_448*448")
-    # mask_root = Path("/home/jzw/data/LiTS/LITS17/train_mask_448*448")
-    img_root = Path("/home/jzw/data/LiTS/LITS17/train_image_224*224")
-    mask_root = Path("/home/jzw/data/LiTS/LITS17/train_mask_224*224")
+    img_root = Path("/home/jzw/data/LiTS/LITS17/train_image_352*352")
+    mask_root = Path("/home/jzw/data/LiTS/LITS17/train_mask_352*352")
+    # img_root = Path("/home/jzw/data/LiTS/LITS17/train_image_224*224")
+    # mask_root = Path("/home/jzw/data/LiTS/LITS17/train_mask_224*224")
     dataset = LitsDataSet(args, img_root, mask_root)
     data_loader=DataLoader(dataset=dataset, batch_size=1, num_workers=1, shuffle=False)
     # for batch_idx, (data, target, fullImg) in enumerate(data_loader):

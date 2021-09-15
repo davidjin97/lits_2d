@@ -1,6 +1,7 @@
 import os
 from glob import glob
 import time
+import datetime
 import shutil
 import logging
 import numpy as np
@@ -21,9 +22,11 @@ from torch.utils.data.distributed import DistributedSampler
 
 from net_builder import build_net
 # from loss.loss impojrt FocalLoss2d
-from dataset.lits.dataset import Dataset
 from evaluate.metric import *
 # from utils.torchsummary import summary
+
+from dataset.lits.dataset import Dataset
+from dataset.lits.lits_2d import LitsDataset
 
 logger = logging.getLogger('global')
 
@@ -32,6 +35,7 @@ class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):
         self.reset()
+
     def reset(self):
         self.val = 0
         self.avg = 0
@@ -98,19 +102,15 @@ class SegTrainer(object):
 
     def _prepare_dataset(self):
         if not self.opt.evaluate:
-            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image3d_jzw/*')
-            mask_paths = glob('/home/jzw/data/LiTS/LITS17/train_mask3d_jzw/*')
+            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
+            # mask_paths = glob('/home/jzw/data/LiTS/LITS17/train_mask_224*224/*')
             if self.opt.debug:
                 img_paths = img_paths[:20]
-                mask_paths = mask_paths[:20]
-            train_img_paths, val_img_paths, train_mask_paths, val_mask_paths = \
-                train_test_split(img_paths, mask_paths, test_size=0.4, random_state=self.opt.manualSeed)
-                # train_test_split(img_paths, mask_paths, test_size=0.3, random_state=19)
+                # mask_paths = mask_paths[:20]
+            train_img_paths, val_img_paths= \
+                train_test_split(img_paths, test_size=0.3, random_state=self.opt.manualSeed)
 
-            # train_dataset = Lits_DataSet(self.opt.train_list,[48, 256, 256],1,self.opt.train_dir)
-            # train_dataset = Lits_DataSet(16,1,self.opt.train_dir,mode='train')
-            # train_dataset = Lits_DataSet(self.opt.train_dir,self.opt.train_list,self.opt.depth)
-            train_dataset = Dataset(self.opt, train_img_paths, train_mask_paths)
+            train_dataset = LitsDataset(self.opt, train_img_paths)
             self.n_train_img = len(train_dataset)
             self.max_iter = self.n_train_img * self.opt.train_epoch // self.opt.batch_size // self.opt.world_size
             train_sampler = DistributedSampler(train_dataset)
@@ -122,9 +122,7 @@ class SegTrainer(object):
             # self.opt.val_dir = self.opt.get('val_dir', '')
             # # if self.opt.val_dir != '':
             #     # val_dataset = Lits_DataSet(self.opt.test_list,[48, 256, 256],1,self.opt.test_dir)
-            #     # val_dataset = Lits_DataSet(16,1,self.opt.test_dir,mode='val')
-            #     # val_dataset = Lits_DataSet(self.opt.test_dir,self.opt.test_list,self.opt.depth)
-            val_dataset = Dataset(self.opt, val_img_paths, val_mask_paths)
+            val_dataset = LitsDataset(self.opt, val_img_paths)
             self.n_val_img = len(val_dataset)
             val_sampler = DistributedSampler(val_dataset)
             self.val_loader = DataLoader(val_dataset, shuffle=False, num_workers=0, batch_size=1,
@@ -132,8 +130,6 @@ class SegTrainer(object):
             logger.info('val with {} pair images'.format(self.n_val_img))
 
         # test_dataset = Lits_DataSet(self.opt.test_list,[48, 256, 256],1,self.opt.test_dir)
-        # test_dataset = Lits_DataSet(16,1,self.opt.train_dir,mode='val')
-        # test_dataset = Lits_DataSet(self.opt.test_dir,self.opt.test_list,self.opt.depth)
         # self.n_test_img = len(test_dataset)
         # test_sampler = DistributedSampler(test_dataset)
         # self.test_loader = DataLoader(test_dataset, shuffle=False, num_workers=0, batch_size=1,
@@ -186,36 +182,47 @@ class SegTrainer(object):
 
         train_start_time = time.time()
         losses = AverageMeter()
+        # ious = AverageMeter()
+        # dices_1s = AverageMeter()
+        # dices_2s = AverageMeter()
         for epoch in range(self.opt.train_epoch):
             epoch_iters = len(self.train_loader)
             for iter_train, (image, mask) in enumerate(self.train_loader):
                 # print(image.shape, mask.shape) # torch.Size([b, 1, 64, 128, 160]) torch.Size([b, 2, 64, 128, 160])
                 image = image.to(self.opt.rank)
                 mask = mask.to(self.opt.rank)
-                output = self.net(image) 
 
-                loss = self.loss_function(output,mask)
+                output = self.net(image) # [2, 2, 352, 352]
+
+                loss = self.loss_function(output, mask)
+                # iou = iou_score(output, target) 
+                # dice_1 = dice_coef(output, target)[0]
+                # dice_2 = dice_coef(output, target)[1]
+
                 losses.update(loss.item(), image.shape[0])
 
                 self.optimizer.zero_grad()
                 loss.backward()
-                # print(f'rank: {self.opt.rank}, Epoch: {epoch+1}/{self.opt.train_epoch},iter: {iter_train+1}/{epoch_iters}, the loss is {loss.item()}')
-                logger.info(f'rank: {self.opt.rank}, Epoch: {epoch+1}/{self.opt.train_epoch},iter: {iter_train+1}/{epoch_iters}, the loss is {loss.item()}')
+                self.optimizer.step()
+                logger.info(f'Training Epoch: {epoch+1}/{self.opt.train_epoch},iter: {iter_train+1}/{epoch_iters}, the loss is {loss.item()}')
+                if self.opt.rank == 0:
+                    writer.add_scalar(f'Loss/train_iter', loss.item(), iter_train + epoch * len(self.train_loader))
+            self.lr_scheduler.step()
 
-            logger.info(f'Start evalute atEpoch: {epoch+1}/{self.opt.train_epoch}')
-            self.val()
+            logger.info(f'Start evalute at Epoch: {epoch+1}/{self.opt.train_epoch}')
+            self.val(epoch)
             self.net.train()
 
-            if self.opt.rank == 0 and ((epoch+1)%self.opt.save_every_epoch)==0:
+            if self.opt.rank == 0 and (epoch+1)%self.opt.save_every_epoch == 0:
                 self.save_checkpoint({'epoch': self.opt.train_epoch,
                                     'arch': self.opt.net_name,
                                     'state_dict': self.net.state_dict(),
-                                    }, f'epoch_{epoch+1}_model_final.pth')
-        logger.info('Finish training, cost time: {} h'.format((time.time()-train_start_time)/3600))
+                                    }, f'epoch_{epoch+1}_model.pth')
+        logger.info(f"Finish training at {datetime.datetime.now()}, cost time: {(time.time()-train_start_time)/3600}h")
 
-    def val(self):
+    def val(self, epoch):
         self.net.eval()
-        losses = AverageMeter()
+        val_losses = AverageMeter()
         # ious = AverageMeter()
         # dices_1s = AverageMeter()
         # dices_2s = AverageMeter()
@@ -223,7 +230,6 @@ class SegTrainer(object):
         with torch.no_grad():
             val_iters = len(self.val_loader)
             for iter_val, (image, mask) in enumerate(self.val_loader):
-                # print(image.shape, mask.shape) # torch.Size([1, 1, 64, 128, 160]) torch.Size([1, 2, 64, 128, 160])
                 image = image.to(self.opt.rank)
                 mask = mask.to(self.opt.rank)
 
@@ -231,8 +237,17 @@ class SegTrainer(object):
                 loss = self.loss_function(output, mask)
                 losses.update(loss.item(), image.shape[0])
 
-                # if self.opt.rank == 0:
-                logger.info(f'iter: {iter_val+1}/{val_iters}, the loss is {loss.item()}')
+                logger.info(f'Val iter: {iter_val+1}/{val_iters}, the loss is {loss.item()}')
+                if self.opt.rank == 0:
+                    writer.add_scalar(f'Loss/val_iter', loss.item(), iter_val+ epoch * len(self.val_loader))
+
+        # log = OrderedDict([
+        #     ('loss', losses.avg),
+        #     # ('iou', ious.avg),
+        #     # ('dice_1', dices_1s.avg),
+        #     # ('dice_2', dices_2s.avg)
+        # ])
+        # return log
                 
 
     def save_checkpoint(self, state_dict, filename='checkpoint.pth'):

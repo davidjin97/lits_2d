@@ -1,15 +1,16 @@
-net_name: 'Unet3d'
-train_dir: '/home/jzw/data/LiTS/LITS17/train_image' # '/home/jzw/data/LiTS/fixed_data/'
-train_list: '/home/jzw/workspace_seg/template_jzw/datatxt/LitsSeg_train.txt'
-test_dir: '/home/jzw/data/LiTS/fixed_data/'
-test_list: '/home/jzw/workspace_seg/template_jzw/datatxt/LitsSeg_test.txt'
-#depth in CT 
-depth: 24
+net_name: 'UNet'
+# train_dir: '/home/jzw/data/LiTS/LITS17/train_image' # '/home/jzw/data/LiTS/fixed_data/'
+# train_list: '/home/jzw/workspace_seg/template_jzw/datatxt/LitsSeg_train.txt'
+# test_dir: '/home/jzw/data/LiTS/fixed_data/'
+# test_list: '/home/jzw/workspace_seg/template_jzw/datatxt/LitsSeg_test.txt'
+## depth in CT 
+# depth: 24
 
 pretrain_model: '' # /home/xzy/projects/BrainSeg/checkpoints/BrainSeg/Unet3D/epoch_85_model_final.pth
-resume_model: '/home/xzy/projects/BrainSeg/checkpoints/BrainSeg/Unet3D/epoch_85_model_final.pth'
-input_height: 256
-input_width: 256
+# resume_model: '/home/xzy/projects/BrainSeg/checkpoints/BrainSeg/Unet3D/epoch_85_model_final.pth'
+input_height: 352
+input_width: 352
+
 train_epoch : 100
 save_every_epoch : 5
 # change the batchsize on each GPU
@@ -18,11 +19,9 @@ print_freq : 100
 last_iter : -1 
 augment: True
 sync: True
-train_output_directory: 'checkpoints/LitsSeg/Unet3D'
-log_directory: 'logs/Unet3D'
+train_output_directory: 'checkpoints/LitsSeg/UNet' # checkout save state_dict
+log_directory: 'logs/UNet' # summery writer
 savedir: 'checkpoints/save'
-caffe_dir: checkpoints/caffe_model/LitsSeg
-onnx_dir: checkpoints/onnx_model/LitsSeg
 
 bn: 'sync'
 

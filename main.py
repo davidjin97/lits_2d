@@ -56,26 +56,19 @@ def start(rank, world_size, args):
     logger.info("Running with config:\n{}".format(format_cfg(config)))
 
     trainer = SegTrainer(config)
-    if args.tocaffe:
-        trainer.convert2caffe(config['caffe_dir'])
-    elif args.toonnx:
-        trainer.convert2onnx(config['onnx_dir'])
+    if not config.evaluate:
+        train_outdir = config['train_output_directory']
+        os.makedirs(train_outdir, exist_ok=True)
+        logger.info('This is for traininig!')
+        trainer.train()
     else:
-        if not config.evaluate:
-            train_outdir = config['train_output_directory']
-            os.makedirs(train_outdir, exist_ok=True)
-            logger.info('This is for traininig!')
-            trainer.train()
-        else:
-            trainer.test()
+        trainer.test()
     cleanup()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='implementation of Brain Seg')
     parser.add_argument('--config', dest='config', required=True)
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true')
-    parser.add_argument('-t', '--tocaffe', dest='tocaffe', action='store_true')
-    parser.add_argument('-onnx', '--toonnx', dest='toonnx', action='store_true')
     parser.add_argument('--world_size',dest='world_size', type=int, default=1) # 单线程
     parser.add_argument('--logname',dest='logname',default='train_jzw.log')
     parser.add_argument('--debug', action='store_true')

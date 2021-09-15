@@ -2,12 +2,14 @@
 # from networks.Th_unet import ResidualUNet3D
 # from networks.AMNet import AMEA_deepvision_res2block
 from networks.Unet3D import Unet3D
+from networks.UNet import UNet
 
 import logging
 logger = logging.getLogger('global')
 
 SUPPORT_NETS = {
                 'Unet3d': Unet3D,
+                'UNet': UNet,
                 # 'seunet': SeUnet,
                 # '3dresidual_unet': ResidualUNet3D,
                 # 'AMEA_deepvision': AMEA_deepvision_res2block,

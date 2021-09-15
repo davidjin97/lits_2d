@@ -314,10 +314,9 @@ def preprocess():
 
         print('Time {:.3f} min'.format((time.time() - start_time) / 60))
         print(saved_idx)
-    print(spacing_set)
 
 if __name__ == '__main__':
-    # """
+    """
     start_time = time.time()
     # logfile = '../logs/printLog0117'
     # if os.path.isfile(logfile):
@@ -333,25 +332,25 @@ if __name__ == '__main__':
     print(time.strftime('%Y/%m/%d-%H:%M:%S', time.localtime()))
     # """
 
-    """
+    # """
     ## test the saved np
     ### 3d images
     # savedct_path = '/home/jzw/data/LiTS/LITS17/train_image3d_jzw/*'
     # savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask3d_jzw/*'
     # savedct_path = '/home/jzw/data/LiTS/LITS17/train_image_224*224/*'
     # savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask_224*224/*'
-    savedct_path = '/home/jzw/data/LiTS/LITS17/train_image_448*448/*'
-    savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask_448*448/*'
+    savedct_path = '/home/jzw/data/LiTS/LITS17/train_image_352*352/*'
+    savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask_352*352/*'
     from glob import glob
     ct_paths = glob(savedct_path)
     seg_paths = glob(savedseg_path)
     print(len(ct_paths), len(seg_paths))
     tn = 0
     for path in ct_paths:
-        if "slice-1" in path:
-            x = np.load(path) 
-            print(x.shape)
-        # if x.shape != (1, 448, 448):
-        #     tn += 1
+        # if "slice-1" in path:
+        x = np.load(path) 
+        #     print(x.shape)
+        if x.shape != (1, 352, 352):
+            tn += 1
     print(f"{tn} / {len(ct_paths)}")
-    """
+    # """
