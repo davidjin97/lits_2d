@@ -1,14 +1,79 @@
 import sys
-from utils.common import *
-from scipy import ndimage
-import numpy as np
-from torchvision import transforms as T
-import torch,os
-from torch.utils.data import Dataset, DataLoader
+import os
+from glob import glob
 import numpy as np
 from collections import  Counter
-np.random.seed(0)
+from pathlib import Path
+# from utils.common import *
+# from scipy import ndimage
+import torch
+from torchvision import transforms as T
+from torch.utils.data import Dataset, DataLoader
+# np.random.seed(0)
 
+class LitsDataset(Dataset):
+    def __init__(self, args, img_paths):
+        self.args = args
+        self.img_paths = img_paths
+        self.mask_paths = list(map(lambda x: x.replace('image', 'mask').replace('slice','seg'), self.img_paths))
+        # self.img_root = img_root
+        # self.mask_root = mask_root
+        # self.img_paths, self.mask_paths = self.get_data_paths()
+        # print(self.img_paths[:5])
+        # self.img_paths = img_paths
+        # self.mask_paths = mask_paths
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, idx):
+        img_path = str(self.img_paths[idx])
+        mask_path = str(self.mask_paths[idx])
+        # print(img_path)
+        # print(mask_path)
+        npimage = np.load(img_path) # (1, 224, 224)
+        npmask = np.load(mask_path) # (1, 224, 224) 0表示背景，1表示肝脏，2表示肝脏肿瘤
+        # print(npimage.shape, npimage.min(), npimage.max(), npimage.mean())
+        # print(npmask.shape, npmask.min(), npmask.max(), npmask.mean())
+        npimage = npimage[0, :, :, np.newaxis] # (224, 224, 1)
+        npimage = npimage.transpose((2, 0, 1)) # (1, 224, 224)
+        npmask = npimage[0, :, :]
+
+        # 拆分 liver 和 tumor label
+        liver_label = npmask.copy()
+        liver_label[npmask == 2] = 1
+        liver_label[npmask == 1] = 1
+
+        tumor_label = npmask.copy()
+        tumor_label[npmask == 1] = 0
+        tumor_label[npmask == 2] = 1
+
+        _, h, w = npimage.shape
+        nplabel = np.empty((w, h, 2))
+
+        nplabel[:, :, 0] = liver_label
+        nplabel[:, :, 1] = tumor_label
+
+        nplabel = nplabel.transpose((2, 0, 1))
+        nplabel = nplabel.astype("float32")
+        npimage = npimage.astype("float32")
+
+        return npimage, nplabel # (1, 224, 224), (2, 224, 224)
+    
+    def get_data_paths(self):
+        img_paths = list(self.img_root.iterdir())
+        # print(img_paths[:4])
+        # print(type(img_paths[1]))
+        # print(type(img_paths))
+        # img_paths = glob(str(img_root))
+        # print(str(img_paths[0]).replace('image', 'mask'))
+
+        mask_paths = list(map(lambda x: Path(str(x).replace('image', 'mask').replace('slice', 'seg')), img_paths))# .replace('slice', 'seg')
+        # print(mask_paths[0].exists())
+        # assert 1>4
+        return img_paths, mask_paths 
+
+'''
 class LitsDataSet(Dataset):
     def __init__(self, raw_data_path, mode=None):
         self.raw_data_path = raw_data_path
@@ -127,10 +192,11 @@ class LitsDataSet(Dataset):
         label_np = sitk_read_raw(self.dataset_path + '/label/' + filename.replace('volume', 'segmentation'),
                                  resize_scale=resize_scale)
         return data_np, label_np
+'''
 
 # 测试代码
-
 if __name__ == '__main__':
+    """
     fixed_path  = '/home/data/LiTS/fixed_data'
     dataset = Lits_DataSet(16,1,fixed_path,mode='val')  #batch size
     # dataset = Lits_DataSet(16,1,fixed_path,mode='train') 
@@ -142,3 +208,19 @@ if __name__ == '__main__':
         print(data.shape, target.shape, torch.unique(target))
         print(data.dtype,target.dtype)
         assert 1>3
+    """
+    args = {}
+    # img_root = Path("/home/jzw/data/LiTS/LITS17/train_image_448*448")
+    # mask_root = Path("/home/jzw/data/LiTS/LITS17/train_mask_448*448")
+    img_root = Path("/home/jzw/data/LiTS/LITS17/train_image_224*224")
+    mask_root = Path("/home/jzw/data/LiTS/LITS17/train_mask_224*224")
+    dataset = LitsDataSet(args, img_root, mask_root)
+    data_loader=DataLoader(dataset=dataset, batch_size=1, num_workers=1, shuffle=False)
+    # for batch_idx, (data, target, fullImg) in enumerate(data_loader):
+    device = torch.device("0")
+    print(device)
+    assert 1>4
+    for batch_idx, (data, target) in enumerate(data_loader):
+        data = data.to()
+        # target = to_one_hot_3d(target.long())
+        print(data.shape, target.shape)
