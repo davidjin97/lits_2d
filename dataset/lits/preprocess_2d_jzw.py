@@ -233,8 +233,8 @@ def preprocess():
 
     # savedct_path = Path('/home/jzw/data/LiTS/LITS17/train_image_224*224_tmp')
     # savedseg_path = Path('/home/jzw/data/LiTS/LITS17/train_mask_224*224_tmp')
-    savedct_path = Path('/home/jzw/data/LiTS/LITS17/train_image_352*352')
-    savedseg_path = Path('/home/jzw/data/LiTS/LITS17/train_mask_352*352')
+    savedct_path = Path('/home/jzw/data/LiTS/LITS17/train_image_352*352_tmp')
+    savedseg_path = Path('/home/jzw/data/LiTS/LITS17/train_mask_352*352_tmp')
 
     train_image = savedct_path
     train_mask = savedseg_path
@@ -346,11 +346,16 @@ if __name__ == '__main__':
     seg_paths = glob(savedseg_path)
     print(len(ct_paths), len(seg_paths))
     tn = 0
-    for path in ct_paths:
+    for path in ct_paths[:5]:
         # if "slice-1" in path:
         x = np.load(path) 
-        #     print(x.shape)
-        if x.shape != (1, 352, 352):
-            tn += 1
-    print(f"{tn} / {len(ct_paths)}")
+        print(x.shape, x.min(), x.max(), x.mean())
+        # if x.shape != (1, 352, 352):
+        #     tn += 1
+    # print(f"{tn} / {len(ct_paths)}")
+    print("seg:")
+    for path in seg_paths[:5]:
+        # if "slice-1" in path:
+        x = np.load(path) 
+        print(x.shape, x.min(), x.max(), x.mean())
     # """

@@ -33,11 +33,13 @@ class LitsDataset(Dataset):
         # print(mask_path)
         npimage = np.load(img_path) # (1, 224, 224)
         npmask = np.load(mask_path) # (1, 224, 224) 0表示背景，1表示肝脏，2表示肝脏肿瘤
-        # print(npimage.shape, npimage.min(), npimage.max(), npimage.mean())
-        # print(npmask.shape, npmask.min(), npmask.max(), npmask.mean())
+        # print(f"npimage0: {npimage.shape}, {npimage.min()}, {npimage.max()}, {npimage.mean()}")
+        # print(f"npmask: {npmask.shape}, {npmask.min()}, {npmask.max()}, {npmask.mean()}")
+
         npimage = npimage[0, :, :, np.newaxis] # (224, 224, 1)
         npimage = npimage.transpose((2, 0, 1)) # (1, 224, 224)
-        npmask = npimage[0, :, :]
+
+        npmask = npmask[0, :, :]
 
         # 拆分 liver 和 tumor label
         liver_label = npmask.copy()
@@ -55,6 +57,7 @@ class LitsDataset(Dataset):
         nplabel[:, :, 1] = tumor_label
 
         nplabel = nplabel.transpose((2, 0, 1))
+
         nplabel = nplabel.astype("float32")
         npimage = npimage.astype("float32")
 
@@ -210,17 +213,19 @@ if __name__ == '__main__':
         assert 1>3
     """
     args = {}
-    img_root = Path("/home/jzw/data/LiTS/LITS17/train_image_352*352")
-    mask_root = Path("/home/jzw/data/LiTS/LITS17/train_mask_352*352")
+    img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
     # img_root = Path("/home/jzw/data/LiTS/LITS17/train_image_224*224")
     # mask_root = Path("/home/jzw/data/LiTS/LITS17/train_mask_224*224")
-    dataset = LitsDataSet(args, img_root, mask_root)
-    data_loader=DataLoader(dataset=dataset, batch_size=1, num_workers=1, shuffle=False)
+    dataset = LitsDataset(args, img_paths)
+    # dataset = LitsDataSet(args, img_root, mask_root)
+    data_loader=DataLoader(dataset=dataset, batch_size=1, num_workers=0, shuffle=False)
     # for batch_idx, (data, target, fullImg) in enumerate(data_loader):
-    device = torch.device("0")
-    print(device)
-    assert 1>4
-    for batch_idx, (data, target) in enumerate(data_loader):
-        data = data.to()
+    device = torch.device("cuda:0")
+    for batch_idx, (image, mask) in enumerate(data_loader):
+        image = image.to(device)
+        mask = mask.to(device)
+        
         # target = to_one_hot_3d(target.long())
-        print(data.shape, target.shape)
+        print(f"image: {image.shape}, {image.min()}, {image.max()}, {image.mean()}")
+        print(f"mask: {mask.shape}, {mask.min()}, {mask.max()}, {mask.mean()}")
+        assert 1>4
