@@ -24,8 +24,10 @@ checkpoints/
 # GitHub Python GitIgnore ----------------------------------------------------------------------------------------------
 # Byte-compiled / optimized / DLL files
 __pycache__/
+evaluate/__pycache__/*
 *.pyc
 *.p
+.ipynb_checkpoints/
 
 venv/
 .idea/*

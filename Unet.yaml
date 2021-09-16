@@ -19,8 +19,11 @@ print_freq : 100
 last_iter : -1 
 augment: True
 sync: True
-train_output_directory: 'checkpoints/LitsSeg/UNet' # checkout save state_dict
-log_directory: 'logs/LitsSeg/UNet' # summery writer
+# train_output_directory: 'checkpoints/LitsSeg/UNet' # checkout save state_dict
+# log_directory: 'logs/LitsSeg/UNet' # summery writer
+running_root: 'runs/lits_seg/unet'
+# checkpoint_directory: 'checkpoints/LitsSeg/UNet'
+# summary_directory: 'summarys/LitsSeg/UNet'
 # savedir: 'checkpoints/save'
 
 bn: 'sync'

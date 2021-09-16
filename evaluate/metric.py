@@ -89,21 +89,19 @@ def mean_iou(output, target):
 
     return np.mean(ious)
 
-
-def iou_score(output, target):
+def iou_score(output, target, thr=0.5):
     smooth = 1e-5
 
     if torch.is_tensor(output):
-        output = torch.sigmoid(output).data.cpu().numpy()
+        output = output.data.cpu().numpy()
     if torch.is_tensor(target):
         target = target.data.cpu().numpy()
-    output_ = output > 0.5
-    target_ = target > 0.5
+    output_ = output > thr
+    target_ = target > thr
     intersection = (output_ & target_).sum()
     union = (output_ | target_).sum()
 
     return (intersection + smooth) / (union + smooth)
-
 
 def dice_coef(output, target):
     # smooth = 1e-5
@@ -122,31 +120,32 @@ def dice_coef(output, target):
     smooth = 1e-5
     num = output.shape[0]
     if torch.is_tensor(output):
-        output = torch.sigmoid(output).data.cpu().numpy()
+        output = output.data.cpu().numpy()
     if torch.is_tensor(target):
         target = target.data.cpu().numpy()
-    # output = torch.sigmoid(output).data.cpu().numpy()
-    # target = target.data.cpu().numpy()
-    input_1 = output[:,0,:,:,:]
-    input_2 = output[:,1,:,:,:]
 
-    target_1 = target[:,0,:,:,:]
-    target_2 = target[:,1,:,:,:]
+    output_1 = output[:,0,:,:]
+    output_2 = output[:,1,:,:]
+
+    target_1 = target[:,0,:,:]
+    target_2 = target[:,1,:,:]
 
     # input_1 = input_1.view(num, -1)
-    # input_2 = input_2.view(num, -1)
-    # input_3 = input_3.view(num, -1)
     # target_1 = target_1.view(num, -1)
-    # target_2 = target_2.view(num, -1)
-    # target_3 = target_3.view(num, -1)
-    intersection_1 = (input_1 * target_1)
-    intersection_2 = (input_2 * target_2)
-    # intersection_3 = (input_3 * target_3)
-    dice_1 = (2. * intersection_1.sum() + smooth) / (input_1.sum() + target_1.sum() + smooth)
-    dice_2 = (2. * intersection_2.sum() + smooth) / (input_2.sum() + target_2.sum() + smooth)
 
-    return dice_1,dice_2
+    intersection_1 = (output_1 * target_1)
+    intersection_2 = (output_2 * target_2)
 
+    dice_1 = (2. * intersection_1.sum() + smooth) / (output_1.sum() + target_1.sum() + smooth)
+    dice_2 = (2. * intersection_2.sum() + smooth) / (output_2.sum() + target_2.sum() + smooth)
+    # if dice_1 > 1.:
+    #     print(output_1.shape, output_1.min(), output_1.max(), output_1.sum())
+    #     print(target_1.shape, target_1.min(), target_1.max(), target_1.sum())
+    #     print(intersection_1.shape, intersection_1.min(), intersection_1.max())
+    #     print(2 * intersection_1.sum(), output_1.sum() + target_1.sum())
+    #     assert 1>4
+
+    return dice_1, dice_2
 
 def accuracy(output, target):
     output = torch.sigmoid(output).view(-1).data.cpu().numpy()

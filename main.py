@@ -6,6 +6,7 @@ import logging
 import shutil
 import yaml
 from easydict import EasyDict
+from pathlib import Path
 
 import torch
 import torch.multiprocessing as mp
@@ -18,7 +19,7 @@ from trainer_lit import SegTrainer
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
+    os.environ['MASTER_PORT'] = '12351'
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 def cleanup():
@@ -44,21 +45,31 @@ def start(rank, world_size, args):
     torch.manual_seed(config.manualSeed)
     torch.cuda.manual_seed_all(config.manualSeed)
 
-    #是否需要转模型
+    # 添加配置参数
     config['evaluate'] = args.evaluate
     config.rank = rank
     config.world_size = world_size
-    config['stride'] = 64
     config.debug = args.debug
+    config.timestamp = args.timestamp
+    if not config.evaluate:
+        config.running_root = str(Path(config.running_root) / "train" / config.timestamp)
+        config.checkpoint_directory = str(Path(config.running_root) / "checkpoints")
+        config.summary_directory = str(Path(config.running_root) / "summarys")
+        config.log_directory = str(Path(config.running_root) / "logs")
+        Path(config.checkpoint_directory).mkdir(parents=True, exist_ok=True)
+        Path(config.summary_directory).mkdir(parents=True, exist_ok=True)
+        Path(config.log_directory).mkdir(parents=True, exist_ok=True)
+    else:
+        config.running_root = str(Path(config.running_root) / "test" / config.timestamp)
+    
     logger.info("Running with config:\n{}".format(format_cfg(config)))
 
     trainer = SegTrainer(config)
     if not config.evaluate:
-        train_outdir = config['train_output_directory']
-        os.makedirs(train_outdir, exist_ok=True)
         logger.info('This is for traininig!')
         trainer.train()
     else:
+        logger.info('This is for testinig!')
         trainer.test()
     cleanup()
 
@@ -71,5 +82,6 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
 
     args = parser.parse_args()
+    args.timestamp = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
     assert (os.path.exists(args.config))
     mp.spawn(start, args=(args.world_size, args), nprocs=args.world_size)

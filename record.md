@@ -32,3 +32,16 @@ A: use `sigmoid` at the end of model.
 run lits_352*353 by UNet
 nohup bash run.sh > train_lits_unet.out 2>&1 &
 pid = 34517
+
+nohup bash run.sh > train_lits_unet_epochloss.out 2>&1 &
+pid = 7854
+
+# 0916
+add ious and dices index in trainer
+
+Q: why dice coef > 1?
+A: the process in LitsDataset has bug
+nohup bash run.sh > train_lite_unet_loss-iou-dice.out 2>&1 &
+pid = 13591
+
+M: perfect the output system

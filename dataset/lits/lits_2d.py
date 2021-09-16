@@ -222,10 +222,10 @@ if __name__ == '__main__':
     # for batch_idx, (data, target, fullImg) in enumerate(data_loader):
     device = torch.device("cuda:0")
     for batch_idx, (image, mask) in enumerate(data_loader):
+        image[image == -9] = 0.5
         image = image.to(device)
         mask = mask.to(device)
         
         # target = to_one_hot_3d(target.long())
         print(f"image: {image.shape}, {image.min()}, {image.max()}, {image.mean()}")
         print(f"mask: {mask.shape}, {mask.min()}, {mask.max()}, {mask.mean()}")
-        assert 1>4

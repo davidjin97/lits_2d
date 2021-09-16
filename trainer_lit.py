@@ -22,7 +22,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from net_builder import build_net
 # from loss.loss impojrt FocalLoss2d
-from evaluate.metric import *
+from evaluate.metric import iou_score, dice_coef
 # from utils.torchsummary import summary
 
 from dataset.lits.dataset import Dataset
@@ -174,56 +174,72 @@ class SegTrainer(object):
     def train(self):
         self.net.train()
         if self.opt.rank == 0:
-            if not self.opt.log_directory:
-                self.opt.log_directory = os.makedirs(self.opt.log_directory)
-            self.writer = SummaryWriter(self.opt.log_directory)
+            self.writer = SummaryWriter(self.opt.summary_directory)
 
         train_start_time = time.time()
-        losses = AverageMeter()
-        # ious = AverageMeter()
-        # dices_1s = AverageMeter()
-        # dices_2s = AverageMeter()
+        best_loss = 100
+        best_iou = 0
+        trigger = 0
+
         for epoch in range(self.opt.train_epoch):
+            losses = AverageMeter()
+            ious = AverageMeter()
+            dices_1s = AverageMeter()
+            dices_2s = AverageMeter()
+
             epoch_iters = len(self.train_loader)
             for iter_train, (image, mask) in enumerate(self.train_loader):
-                # print(image.shape, mask.shape) # torch.Size([b, 1, 64, 128, 160]) torch.Size([b, 2, 64, 128, 160])
                 image = image.to(self.opt.rank)
                 mask = mask.to(self.opt.rank)
 
-                output = self.net(image) # [2, 2, 352, 352]
+                output = self.net(image)
+                # if self.opt.rank == 0:
+                #     print(f"image: {image.shape}, {image.min()}, {image.max()}, {image.mean()}")
+                #     print(f"mask: {mask.shape}, {mask.min()}, {mask.max()}, {mask.mean()}")
+                #     print(f"output: {output.shape}, {output.min()}, {output.max()}, {output.mean()}")
 
                 loss = self.loss_function(output, mask)
-                # iou = iou_score(output, target) 
-                # dice_1 = dice_coef(output, target)[0]
-                # dice_2 = dice_coef(output, target)[1]
+                iou = iou_score(output, mask) 
+                dice_1 = dice_coef(output, mask)[0]
+                dice_2 = dice_coef(output, mask)[1]
 
                 losses.update(loss.item(), image.shape[0])
+                ious.update(iou, image.shape[0])
+                dices_1s.update(dice_1, image.shape[0])
+                dices_2s.update(dice_2, image.shape[0])
 
+                # compute gradient and do optimizing step
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
+
                 logger.info(f'Training Epoch: {epoch+1}/{self.opt.train_epoch},iter: {iter_train+1}/{epoch_iters}, the loss is {loss.item()}')
-                if self.opt.rank == 0:
-                    self.writer.add_scalar(f'Loss/train_iter', loss.item(), iter_train + epoch * len(self.train_loader))
-            # self.lr_scheduler.step()
+               
+            self.lr_scheduler.step()
+
+            if self.opt.rank == 0:
+                self.writer.add_scalar(f'loss/train_epoch', losses.avg, epoch) # 平均每条数据的loss，即batch=1
+                self.writer.add_scalar(f'iou/train_epoch', ious.avg, epoch)
+                self.writer.add_scalar(f'dice_1/train_epoch', dices_1s.avg, epoch)
+                self.writer.add_scalar(f'dice_2/train_epoch', dices_2s.avg, epoch)
 
             logger.info(f'Start evalute at Epoch: {epoch+1}/{self.opt.train_epoch}')
             self.val(epoch)
-            self.net.train()
+            
 
-            if self.opt.rank == 0 and (epoch+1)%self.opt.save_every_epoch == 0:
-                self.save_checkpoint({'epoch': self.opt.train_epoch,
-                                    'arch': self.opt.net_name,
-                                    'state_dict': self.net.state_dict(),
-                                    }, f'epoch_{epoch+1}_model.pth')
+            # if self.opt.rank == 0 and (epoch+1) % self.opt.save_every_epoch == 0:
+            #     self.save_checkpoint({'epoch': self.opt.train_epoch,
+            #                         'arch': self.opt.net_name,
+            #                         'state_dict': self.net.state_dict(),
+            #                         }, f'epoch_{epoch+1}_model.pth')
         logger.info(f"Finish training at {datetime.datetime.now()}, cost time: {(time.time()-train_start_time)/3600}h")
 
     def val(self, epoch):
         self.net.eval()
         losses = AverageMeter()
-        # ious = AverageMeter()
-        # dices_1s = AverageMeter()
-        # dices_2s = AverageMeter()
+        ious = AverageMeter()
+        dices_1s = AverageMeter()
+        dices_2s = AverageMeter()
 
         with torch.no_grad():
             val_iters = len(self.val_loader)
@@ -232,20 +248,33 @@ class SegTrainer(object):
                 mask = mask.to(self.opt.rank)
 
                 output = self.net(image) 
+
                 loss = self.loss_function(output, mask)
+                iou = iou_score(output, mask) 
+                dice_1 = dice_coef(output, mask)[0]
+                dice_2 = dice_coef(output, mask)[1]
+
                 losses.update(loss.item(), image.shape[0])
+                ious.update(iou, image.shape[0])
+                dices_1s.update(dice_1, image.shape[0])
+                dices_2s.update(dice_2, image.shape[0])
 
                 logger.info(f'Val iter: {iter_val+1}/{val_iters}, the loss is {loss.item()}')
-                if self.opt.rank == 0:
-                    self.writer.add_scalar(f'Loss/val_iter', loss.item(), iter_val+ epoch * len(self.val_loader))
 
-        # log = OrderedDict([
+            if self.opt.rank == 0:
+                self.writer.add_scalar(f'loss/val_epoch', losses.avg, epoch)
+                self.writer.add_scalar(f'iou/val_epoch', ious.avg, epoch)
+                self.writer.add_scalar(f'dice_1/val_epoch', dices_1s.avg, epoch)
+                self.writer.add_scalar(f'dice_2/val_epoch', dices_2s.avg, epoch)
+
+        self.net.train()
+        # val_res = OrderedDict([
         #     ('loss', losses.avg),
         #     # ('iou', ious.avg),
         #     # ('dice_1', dices_1s.avg),
         #     # ('dice_2', dices_2s.avg)
         # ])
-        # return log
+        # return val_res
                 
 
     def save_checkpoint(self, state_dict, filename='checkpoint.pth'):
