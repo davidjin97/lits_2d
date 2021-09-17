@@ -19,7 +19,7 @@ from trainer_lit import SegTrainer
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12351'
+    os.environ['MASTER_PORT'] = '12354'
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 def cleanup():

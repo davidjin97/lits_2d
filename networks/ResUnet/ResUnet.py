@@ -1,19 +1,23 @@
+import os
+import sys
 import torch
 import torch.nn as nn
-from ResUNetModules import ResidualConv, Upsample
+from networks.ResUnet.modules import ResidualConv, Upsample
 
 class ResUnet(nn.Module):
-    def __init__(self, channel, filters=[64, 128, 256, 512]):
+    def __init__(self, in_channels, out_channels, filters=[64, 128, 256, 512]):
         super(ResUnet, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
 
         self.input_layer = nn.Sequential(
-            nn.Conv2d(channel, filters[0], kernel_size=3, padding=1),
+            nn.Conv2d(in_channels, filters[0], kernel_size=3, padding=1),
             nn.BatchNorm2d(filters[0]),
             nn.ReLU(),
             nn.Conv2d(filters[0], filters[0], kernel_size=3, padding=1),
         )
         self.input_skip = nn.Sequential(
-            nn.Conv2d(channel, filters[0], kernel_size=3, padding=1)
+            nn.Conv2d(in_channels, filters[0], kernel_size=3, padding=1)
         )
 
         self.residual_conv_1 = ResidualConv(filters[0], filters[1], 2, 1)
@@ -31,7 +35,7 @@ class ResUnet(nn.Module):
         self.up_residual_conv3 = ResidualConv(filters[1] + filters[0], filters[0], 1, 1)
 
         self.output_layer = nn.Sequential(
-            nn.Conv2d(filters[0], 1, 1, 1),
+            nn.Conv2d(filters[0], out_channels, 1, 1),
             nn.Sigmoid(),
         )
 
@@ -61,3 +65,22 @@ class ResUnet(nn.Module):
         output = self.output_layer(x10)
 
         return output
+
+if __name__ == "__main__":
+    gpu_ids = "2, 3"
+    os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ids
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device_ids = list(range(torch.cuda.device_count()))
+
+    model = ResUnet(1, 2).to(device)
+
+    if len(device_ids) > 1:
+        model = torch.nn.DataParallel(model, device_ids=device_ids)
+
+    # input = torch.randn((2, 1, 64, 128, 160)).to(device) # BCDHW
+    input = torch.randn(4, 1, 352, 352).to(device) # BCHW 
+    output = model(input)
+
+    print("input.shape: ", input.shape)
+    print("output.shape: ", output.shape) # 2, 2, 32, 64, 64
+    print(f"min: {output.min()}, max: {output.max()}")

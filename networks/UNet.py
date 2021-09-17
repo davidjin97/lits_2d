@@ -107,7 +107,7 @@ class UNet(nn.Module):
         return logits
 
 if __name__ == "__main__":
-    gpu_ids = "2, 3"
+    gpu_ids = "2"
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ids
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_ids = list(range(torch.cuda.device_count()))

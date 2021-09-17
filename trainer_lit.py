@@ -177,9 +177,10 @@ class SegTrainer(object):
             self.writer = SummaryWriter(self.opt.summary_directory)
 
         train_start_time = time.time()
-        best_loss = 100
+        best_loss = 1e10
         best_iou = 0
-        trigger = 0
+        saved_trigger = 0
+        saved_epoch = set()
 
         for epoch in range(self.opt.train_epoch):
             losses = AverageMeter()
@@ -224,14 +225,36 @@ class SegTrainer(object):
                 self.writer.add_scalar(f'dice_2/train_epoch', dices_2s.avg, epoch)
 
             logger.info(f'Start evalute at Epoch: {epoch+1}/{self.opt.train_epoch}')
-            self.val(epoch)
-            
+            val_res = self.val(epoch)
 
-            # if self.opt.rank == 0 and (epoch+1) % self.opt.save_every_epoch == 0:
-            #     self.save_checkpoint({'epoch': self.opt.train_epoch,
-            #                         'arch': self.opt.net_name,
-            #                         'state_dict': self.net.state_dict(),
-            #                         }, f'epoch_{epoch+1}_model.pth')
+            saved_trigger += 1 
+            if self.opt.rank == 0:
+                if epoch >= int(self.opt.train_epoch // 2) and epoch not in saved_epoch and val_res["loss"] < best_loss:
+                    saved_epoch.add(epoch)
+                    saved_trigger = 0
+                    self.save_checkpoint({'epoch': self.opt.train_epoch,
+                                        'arch': self.opt.net_name,
+                                        'state_dict': self.net.state_dict(),
+                                        }, f'epoch_{epoch+1}_model_best_loss.pth')
+                if epoch >= int(self.opt.train_epoch // 2) and epoch not in saved_epoch and val_res["iou"] > best_iou:
+                    saved_epoch.add(epoch)
+                    saved_trigger = 0
+                    self.save_checkpoint({'epoch': self.opt.train_epoch,
+                                        'arch': self.opt.net_name,
+                                        'state_dict': self.net.state_dict(),
+                                        }, f'epoch_{epoch+1}_model_best_iou.pth')
+                if epoch not in saved_epoch and (epoch+1) % self.opt.save_every_epoch == 0:
+                    saved_epoch.add(epoch)
+                    self.save_checkpoint({'epoch': self.opt.train_epoch,
+                                        'arch': self.opt.net_name,
+                                        'state_dict': self.net.state_dict(),
+                                        }, f'epoch_{epoch+1}_model.pth')
+                
+                # if not self.opt.early_stop is None:
+                #     if saved_trigger >= self.opt.early_stop:
+                #         logger.info(f'Early stop at Epoch: {epoch+1}/{self.opt.train_epoch}')
+                #         break
+
         logger.info(f"Finish training at {datetime.datetime.now()}, cost time: {(time.time()-train_start_time)/3600}h")
 
     def val(self, epoch):
@@ -268,14 +291,15 @@ class SegTrainer(object):
                 self.writer.add_scalar(f'dice_2/val_epoch', dices_2s.avg, epoch)
 
         self.net.train()
-        # val_res = OrderedDict([
-        #     ('loss', losses.avg),
-        #     # ('iou', ious.avg),
-        #     # ('dice_1', dices_1s.avg),
-        #     # ('dice_2', dices_2s.avg)
-        # ])
-        # return val_res
+
+        val_res = {
+            'loss': losses.avg,
+            'iou': ious.avg,
+            'dice_1': dices_1s.avg,
+            'dice_2': dices_2s.avg
+        }
+        return val_res
                 
 
     def save_checkpoint(self, state_dict, filename='checkpoint.pth'):
-        torch.save(state_dict, os.path.join(self.opt.train_output_directory, filename))
+        torch.save(state_dict, os.path.join(self.opt.checkpoint_directory, filename))

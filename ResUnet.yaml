@@ -1,4 +1,4 @@
-net_name: 'UNet'
+net_name: 'ResUnet'
 # train_dir: '/home/jzw/data/LiTS/LITS17/train_image' # '/home/jzw/data/LiTS/fixed_data/'
 # train_list: '/home/jzw/workspace_seg/template_jzw/datatxt/LitsSeg_train.txt'
 # test_dir: '/home/jzw/data/LiTS/fixed_data/'
@@ -22,7 +22,7 @@ augment: True
 sync: True
 # train_output_directory: 'checkpoints/LitsSeg/UNet' # checkout save state_dict
 # log_directory: 'logs/LitsSeg/UNet' # summery writer
-running_root: 'runs/lits_seg/unet'
+running_root: 'runs/lits_seg/res_unet'
 # checkpoint_directory: 'checkpoints/LitsSeg/UNet'
 # summary_directory: 'summarys/LitsSeg/UNet'
 # savedir: 'checkpoints/save'

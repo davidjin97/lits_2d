@@ -1,1 +1,2 @@
-CUDA_VISIBLE_DEVICES=0,1 python main.py --config Unet3D.yaml --world_size 2
+# CUDA_VISIBLE_DEVICES=0,1 python main.py --config Unet.yaml --world_size 2 --logname train_lits_unet_runsout.log
+# CUDA_VISIBLE_DEVICES=2,3 python main.py --config ResUnet.yaml --world_size 2 --logname train_lits_resunet.log

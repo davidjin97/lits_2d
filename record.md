@@ -1,9 +1,8 @@
-# 显存分析
+# 0913
+显存分析
 batch=2
 size = [2, 1, 64, 128, 160]，显存在epoch=2的第2个iter会爆
 2*1*64*128*160 = 2621440
-
-# 代码疑问
 
 # 0914
 执行224*224数据切割
@@ -45,3 +44,13 @@ nohup bash run.sh > train_lite_unet_loss-iou-dice.out 2>&1 &
 pid = 13591
 
 M: perfect the output system
+
+train ResUNet and UNet
+CUDA_VISIBLE_DEVICES=0,1 python main.py --config Unet.yaml --world_size 2 --logname train_lits_unet_runsout.log
+nohup bash run.sh > train_lits_unet_runsout.out 2>&1 &
+pid = 6812
+CUDA_VISIBLE_DEVICES=2,3 python main.py --config ResUnet.yaml --world_size 2 --logname train_lits_resunet.log
+nohup bash run.sh > train_lits_resunet.out 2>&1 &
+pid = 7075
+
+# 0916
