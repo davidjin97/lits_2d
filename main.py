@@ -19,7 +19,7 @@ from trainer_lit import SegTrainer
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12354'
+    os.environ['MASTER_PORT'] = '12355'
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 def cleanup():
@@ -27,30 +27,35 @@ def cleanup():
 
 def start(rank, world_size, args):
     setup(rank, world_size)
-    init_logging('global', logging.INFO, args.logname, rank)
-    logger = logging.getLogger('global')
 
     torch.cuda.is_available()
     torch.cuda.empty_cache()
     cudnn.benchmark = True
+
+    # 读入config
     config_file = args.config
-    logger.info('cfg_file: {}'.format(config_file))
     with open(config_file, 'r') as f:
         config = yaml.load(f, Loader=yaml.Loader)
     config = EasyDict(config)
+
+
     
     #设置随机种子
     config.manualSeed = random.randint(1, 10000)
+    config.manualSeed = 3847
     random.seed(config.manualSeed)
     torch.manual_seed(config.manualSeed)
     torch.cuda.manual_seed_all(config.manualSeed)
 
     # 添加配置参数
-    config['evaluate'] = args.evaluate
+    config.evaluate = args.evaluate
     config.rank = rank
     config.world_size = world_size
     config.debug = args.debug
+    config.logname = args.logname
     config.timestamp = args.timestamp
+    
+    # 路径设置
     if not config.evaluate:
         config.running_root = str(Path(config.running_root) / "train" / config.timestamp)
         config.checkpoint_directory = str(Path(config.running_root) / "checkpoints")
@@ -61,7 +66,14 @@ def start(rank, world_size, args):
         Path(config.log_directory).mkdir(parents=True, exist_ok=True)
     else:
         config.running_root = str(Path(config.running_root) / "test" / config.timestamp)
+        config.log_directory = str(Path(config.running_root) / "logs")
+        Path(config.log_directory).mkdir(parents=True, exist_ok=True)
     
+    # 初始化并创建 logger
+    init_logging('global', logging.INFO, str(Path(config.log_directory) / args.logname), rank)
+    logger = logging.getLogger('global')
+
+    logger.info('cfg_file: {}'.format(config_file))
     logger.info("Running with config:\n{}".format(format_cfg(config)))
 
     trainer = SegTrainer(config)
