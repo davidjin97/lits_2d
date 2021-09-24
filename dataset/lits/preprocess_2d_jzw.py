@@ -346,12 +346,12 @@ if __name__ == '__main__':
     seg_paths = glob(savedseg_path)
     print(len(ct_paths), len(seg_paths))
     tn = 0
-    for path in ct_paths[:5]:
-        # if "slice-1" in path:
-        x = np.load(path) 
-        print(x.shape, x.min(), x.max(), x.mean())
-        # if x.shape != (1, 352, 352):
-        #     tn += 1
+    # for path in ct_paths[:5]:
+    #     # if "slice-1" in path:
+    #     x = np.load(path) 
+    #     print(x.shape, x.min(), x.max(), x.mean())
+    #     # if x.shape != (1, 352, 352):
+    #     #     tn += 1
     # print(f"{tn} / {len(ct_paths)}")
     print("seg:")
     for path in seg_paths[:5]:

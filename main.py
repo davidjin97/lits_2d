@@ -19,7 +19,7 @@ from trainer_lit import SegTrainer
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
+    os.environ['MASTER_PORT'] = '12357'
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 def cleanup():
@@ -67,7 +67,9 @@ def start(rank, world_size, args):
     else:
         config.running_root = str(Path(config.running_root) / "test" / config.timestamp)
         config.log_directory = str(Path(config.running_root) / "logs")
+        config.visual_directory = str(Path(config.running_root) / "visual")
         Path(config.log_directory).mkdir(parents=True, exist_ok=True)
+        Path(config.visual_directory).mkdir(parents=True, exist_ok=True)
     
     # 初始化并创建 logger
     init_logging('global', logging.INFO, str(Path(config.log_directory) / args.logname), rank)

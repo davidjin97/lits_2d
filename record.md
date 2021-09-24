@@ -53,4 +53,16 @@ CUDA_VISIBLE_DEVICES=2,3 python main.py --config ResUnet.yaml --world_size 2 --l
 nohup bash run.sh > train_lits_resunet.out 2>&1 &
 pid = 7075
 
-# 0916
+# 0922
+编写test方法
+
+# 0924
+在test中将结果进行可视化，发现tumor的mask有些分散，并且没有成功预测
+
+add model `SEUnet`
+CUDA_VISIBLE_DEVICES=2,3 python main.py --config SEUnet.yaml --world_size 2 --logname train_lits_seunet.log
+nohup bash run.sh > train_lits_seunet.out 2>&1 &
+pid = 20756
+
+使用 train_image2d预处理数据进行计算
+CUDA_VISIBLE_DEVICES=2,3 python main.py --config SEUnet.yaml --world_size 2 --logname train_lits_train_image2d_seunet.log

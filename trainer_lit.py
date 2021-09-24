@@ -1,5 +1,6 @@
 import os
 from glob import glob
+from pathlib import Path
 import time
 import datetime
 import shutil
@@ -23,6 +24,7 @@ from torch.utils.data.distributed import DistributedSampler
 from net_builder import build_net
 # from loss.loss impojrt FocalLoss2d
 from evaluate.metric import iou_score, dice_coef
+from evaluate import metric
 # from utils.torchsummary import summary
 
 from dataset.lits.dataset import Dataset
@@ -100,7 +102,8 @@ class SegTrainer(object):
 
     def _prepare_dataset(self):
         if not self.opt.evaluate:
-            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
+            # img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
+            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image2d/*')
             # mask_paths = glob('/home/jzw/data/LiTS/LITS17/train_mask_224*224/*')
             if self.opt.debug:
                 img_paths = img_paths[:20]
@@ -126,6 +129,16 @@ class SegTrainer(object):
             self.val_loader = DataLoader(val_dataset, shuffle=False, num_workers=0, batch_size=1,
                                             pin_memory=True, sampler=val_sampler)
             logger.info('val with {} pair images'.format(self.n_val_img))
+        else:
+            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
+            train_img_paths, test_img_paths= \
+                train_test_split(img_paths, test_size=0.3, random_state=self.opt.manualSeed)
+            test_dataset = LitsDataset(self.opt, test_img_paths)
+            self.n_test_img = len(test_dataset)
+            test_sampler = DistributedSampler(test_dataset)
+            self.test_loader = DataLoader(test_dataset, shuffle=False, num_workers=0, batch_size=1,
+                                            pin_memory=True, sampler=test_sampler)
+            logger.info('test with {} pair images'.format(self.n_test_img))
 
         # test_dataset = Lits_DataSet(self.opt.test_list,[48, 256, 256],1,self.opt.test_dir)
         # self.n_test_img = len(test_dataset)
@@ -300,6 +313,91 @@ class SegTrainer(object):
         }
         return val_res
                 
+    def test(self):
+        self.net.eval()
+        # checkpoint_root = Path("runs/lits_seg/unet/train_2021-09-16-22-20-37/checkpoints")
+        # model_name = "epoch_100_model_best_loss.pth"
+        # checkpint_path = checkpint_root / model_name
+
+        # ious = AverageMeter()
+        ious_1s = AverageMeter()
+        ious_2s = AverageMeter()
+        dices_1s = AverageMeter()
+        dices_2s = AverageMeter()
+
+        # self.load_checkpoint(self.net, checkpint_path)
+
+        with torch.no_grad():
+            test_iters = len(self.test_loader)
+            for iter_test, (image, mask) in tqdm(enumerate(self.test_loader), total=len(self.test_loader)):
+                image = image.to(self.opt.rank)
+                mask = mask.to(self.opt.rank)
+                output = self.net(image) 
+                assert (image.shape[0] == 1 and mask.shape[0] == 1), "Please set batch size = 1 when test."
+                # print(output.shape)
+                # print(mask.shape)
+
+                # print(output[0][1].min(), output[0][1].max(), output[0][1].mean())
+                # print(mask[0][1].min(), mask[0][1].max(), mask[0][1].mean())
+                iou_1 = metric.mean_iou(output[0][0], mask[0][0]) 
+                iou_2 = metric.mean_iou(output[0][1], mask[0][1]) 
+                # print(iou_1)
+                # print(iou_2)
+                # iou_1 = metric.iou_score(output[0][0], mask[0][0]) 
+                # iou_2 = metric.iou_score(output[0][1], mask[0][1]) 
+                # print(iou_1)
+                # print(iou_2)
+                # assert 1>4
+
+                dice_1 = metric.dice_coef(output, mask)[0]
+                dice_2 = metric.dice_coef(output, mask)[1]
+
+                ious_1s.update(iou_1, image.shape[0])
+                ious_2s.update(iou_2, image.shape[0])
+                dices_1s.update(dice_1, image.shape[0])
+                dices_2s.update(dice_2, image.shape[0])
+
+                logger.info("Save visual images.")
+                print("Save visual images.")
+                if iter_test < 40:
+                    # print(mask.shape)
+                    if mask[0][1:2].sum() > 0:
+                        print(mask[0][:1].sum())
+                        print(iter_test)
+                    # print(type(mask[0][:1]), mask[0][:1].shape)
+                    # assert 1>4
+                    # cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_img.png"), image[0][0])
+                    # cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_liver_out.png"), output[0][0])
+                        saved_mask0 = (mask[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
+                        cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_liver_mask.png"), saved_mask0)
+                        saved_output0 = (output[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8) 
+                        cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_liver_out.png"), saved_output0)
+                        saved_mask1 = (mask[0][1:2].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
+                        cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_tumor_mask.png"), saved_mask1)
+                        saved_output1 = (output[0][1:2].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8) 
+                        cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_tumor_out.png"), saved_output1)
+                        assert 1>4
+
+                # logger.info(f'Val iter: {iter_test+1}/{val_iters}, the loss is {loss.item()}')
+        # print('*' * 15, self.model_name + ':', '*' * 15)
+
+        logger.info('*' * 15, "liver_mIoU:", ious_1s.avg, '*' * 15)
+        logger.info('*' * 15, "liver_DiceScore:", dices_1s.avg, '*' * 15)
+
+        logger.info('*' * 15, "tumor_mIoU:", ious_1s.avg, '*' * 15)
+        logger.info('*' * 15, "tumor_DiceScore:", dices_2s.avg, '*' * 15)
 
     def save_checkpoint(self, state_dict, filename='checkpoint.pth'):
         torch.save(state_dict, os.path.join(self.opt.checkpoint_directory, filename))
+
+    def load_checkpoint(self, model, checkpoint_path):
+        loaded_dict = torch.load(checkpoint_path)
+        state_dict = loaded_dict[state_dict]
+        model.load_state_dict(state_dict)
+    
+    def load_state_keywise(self, model_path):
+        map_location = {'cuda:%d' % 0: 'cuda:%d' % self.opt.rank}
+        resume_dict = torch.load(model_path, map_location=map_location)
+        if 'state_dict' in resume_dict.keys():
+            resume_dict = resume_dict['state_dict']
+        self.net.load_state_dict(resume_dict)

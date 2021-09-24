@@ -4,6 +4,7 @@ from glob import glob
 import numpy as np
 from collections import  Counter
 from pathlib import Path
+import cv2
 # from utils.common import *
 # from scipy import ndimage
 import torch
@@ -33,6 +34,8 @@ class LitsDataset(Dataset):
         # print(mask_path)
         npimage = np.load(img_path) # (1, 224, 224)
         npmask = np.load(mask_path) # (1, 224, 224) 0表示背景，1表示肝脏，2表示肝脏肿瘤
+        npimage = npimage.transpose((2, 0, 1))[:1, :, :]
+        npmask = npmask[np.newaxis, :, :]
         # print(f"npimage0: {npimage.shape}, {npimage.min()}, {npimage.max()}, {npimage.mean()}")
         # print(f"npmask: {npmask.shape}, {npmask.min()}, {npmask.max()}, {npmask.mean()}")
 
@@ -213,19 +216,30 @@ if __name__ == '__main__':
         assert 1>3
     """
     args = {}
-    img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
-    # img_root = Path("/home/jzw/data/LiTS/LITS17/train_image_224*224")
-    # mask_root = Path("/home/jzw/data/LiTS/LITS17/train_mask_224*224")
+    # img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
+    img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image2d/*')
     dataset = LitsDataset(args, img_paths)
     # dataset = LitsDataSet(args, img_root, mask_root)
     data_loader=DataLoader(dataset=dataset, batch_size=1, num_workers=0, shuffle=False)
     # for batch_idx, (data, target, fullImg) in enumerate(data_loader):
-    device = torch.device("cuda:0")
+    # device = torch.device("cuda:0")
+    visual_directory = Path("./dataset/lits/visual")
+    visual_directory.mkdir(parents=True, exist_ok=True)
     for batch_idx, (image, mask) in enumerate(data_loader):
-        image[image == -9] = 0.5
-        image = image.to(device)
-        mask = mask.to(device)
+        if batch_idx > 10:
+            break
+        # image[image == -9] = 0.5
+        # image = image.to(device)
+        # mask = mask.to(device)
         
         # target = to_one_hot_3d(target.long())
         print(f"image: {image.shape}, {image.min()}, {image.max()}, {image.mean()}")
         print(f"mask: {mask.shape}, {mask.min()}, {mask.max()}, {mask.mean()}")
+
+        # visual
+        # saved_img = (image[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
+        # cv2.imwrite(str(visual_directory / f"{str(batch_idx)}_img.png"), saved_img)
+        # saved_mask0 = (mask[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
+        # cv2.imwrite(str(visual_directory / f"{str(batch_idx)}_liver_mask.png"), saved_mask0)
+        # saved_mask1 = (mask[0][1:2].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
+        # cv2.imwrite(str(visual_directory / f"{str(batch_idx)}_tumor_mask.png"), saved_mask1)

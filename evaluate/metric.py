@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+'''
 def mean_iou(y_true_in, y_pred_in, print_table=False):
     if True: #not np.sum(y_true_in.flatten()) == 0:
         labels = y_true_in
@@ -60,6 +61,7 @@ def mean_iou(y_true_in, y_pred_in, print_table=False):
             return 1
         else:
             return 0
+'''
 
 def batch_iou(output, target):
     output = torch.sigmoid(output).data.cpu().numpy() > 0.5
@@ -76,7 +78,8 @@ def batch_iou(output, target):
 def mean_iou(output, target):
     smooth = 1e-5
 
-    output = torch.sigmoid(output).data.cpu().numpy()
+    # output = torch.sigmoid(output).data.cpu().numpy()
+    output = output.data.cpu().numpy()
     target = target.data.cpu().numpy()
     ious = []
     for t in np.arange(0.5, 1.0, 0.05):
@@ -85,6 +88,7 @@ def mean_iou(output, target):
         intersection = (output_ & target_).sum()
         union = (output_ | target_).sum()
         iou = (intersection + smooth) / (union + smooth)
+        # print(iou)
         ious.append(iou)
 
     return np.mean(ious)
