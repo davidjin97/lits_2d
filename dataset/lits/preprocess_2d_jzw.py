@@ -5,6 +5,7 @@ import scipy.ndimage as ndimage
 from skimage.transform import resize
 import time
 import sys
+import logging
 sys.path.append('/home/jzw/workspace_seg/template_seg_jzw/')
 sys.path.append('/home/jzw/workspace_seg/template_seg_jzw/dataset/')
 from utils.utils import *
@@ -12,6 +13,7 @@ import zipfile
 from pathlib import Path
 import re
 from tqdm import tqdm
+import cv2
 
 
 def normalize(slice, bottom=99.5, down=0.5):
@@ -36,7 +38,7 @@ def normalize(slice, bottom=99.5, down=0.5):
         # the min is replaced with -9 just to keep track of 0 intensities
         # so that we can discard those intensities afterwards when sampling random patches
         # 但我发现强度并不是在0-5000
-        tmp[tmp == tmp.min()] = -9
+        # tmp[tmp == tmp.min()] = -9
         return tmp
 
 def generate_subimage(ct_array, seg_array, stridez, stridex, stridey, blockz, blockx, blocky,
@@ -148,8 +150,9 @@ def generate_subimage_352_352(ct_array, seg_array, stridez, stridex, stridey, bl
         assert seg_block.shape == (1, 352, 352)
         # print(seg_block.shape, stx, stx+blockx)
         ct_block= ct_array[z: z+1, stx: stx+blockx, sty: sty+blocky]
-        saved_ctname = savedct_path / (f"slice-{volume_num}_{z}.npy")
-        saved_segname = savedseg_path / (f"seg-{volume_num}_{z}.npy")
+        saved_ctname = savedct_path / (f"slice-{volume_num}_{z}+{bb[0]}.npy")
+        saved_segname = savedseg_path / (f"seg-{volume_num}_{z}+{bb[0]}.npy")
+        print(saved_ctname)
         np.save(str(saved_ctname), ct_block)
         np.save(str(saved_segname), seg_block)
         idx = idx + 1
@@ -219,6 +222,22 @@ def find_bb(volume):
     return bb
 
 def preprocess():
+    # logger = logging.getLogger("data_preprocess")
+    # logger.setLevel(logging.DEBUG)
+
+    # log_format = '%(asctime)s [%(pathname)s line:%(lineno)d] %(levelname)s: %(message)s'
+    # formatter = logging.Formatter(fmt=log_format)
+
+    # log_dir = Path('/home/jzw/data/LiTS/LITS17/train_mask_352*352_log')
+    # file_handler = logging.FileHandler(str(log_dir), 'w+')
+    # file_handler.setFormatter(formatter)
+    # file_handler.setLevel(logging.DEBUG)
+
+    # logger.addHandler(file_handler)
+
+    # logger.debug("~~!")
+    # assert 1>3
+
     """
     get 3d npy image, size_zyx: [64, 128, 160]
     """
@@ -231,10 +250,10 @@ def preprocess():
     if not labels_path.exists():
         print("labels_path doesn't exist")
 
-    # savedct_path = Path('/home/jzw/data/LiTS/LITS17/train_image_224*224_tmp')
-    # savedseg_path = Path('/home/jzw/data/LiTS/LITS17/train_mask_224*224_tmp')
-    savedct_path = Path('/home/jzw/data/LiTS/LITS17/train_image_352*352_tmp')
-    savedseg_path = Path('/home/jzw/data/LiTS/LITS17/train_mask_352*352_tmp')
+    savedct_path = Path('/home/jzw/data/LiTS/LITS17/train_image_352*352_nospacing')
+    savedseg_path = Path('/home/jzw/data/LiTS/LITS17/train_mask_352*352_nospacing')
+    # savedct_path = Path('/home/jzw/data/LiTS/LITS17/train_image_352*352_no-9')
+    # savedseg_path = Path('/home/jzw/data/LiTS/LITS17/train_mask_352*352_no-9')
 
     train_image = savedct_path
     train_mask = savedseg_path
@@ -254,6 +273,7 @@ def preprocess():
     stridez = 1; stridex = blockx//4; stridey = blocky//4
     # spacing_set = set()
     for ct_file in tqdm(images_path.iterdir()):
+        print(str(ct_file))
         # volume_num = re.findall(r"\d+", ct_file.name)[0]
         # if volume_num != "1":
         #     continue
@@ -271,27 +291,27 @@ def preprocess():
         # continue
         
         ct_array = sitk.GetArrayFromImage(ct) # (461, 512, 512)
-        # print(ct_array.shape)
         seg = sitk.ReadImage(str(labels_path / ct_file.name.replace('volume', 'segmentation')), sitk.sitkUInt8)
         seg_array = sitk.GetArrayFromImage(seg) # (461, 512, 512))
 
         # step1: spacing interpolation
+        '''
         real_resize_factor = get_realfactor(spacing, new_spacing, ct_array) # [1.        1.0546875 1.0546875]
         # 根据输出out_spacing设置新的size
         # nearest is order=0, Bilinear interpolation would be order=1, and cubic is the default (order=3).
         ct_array = ndimage.zoom(ct_array, real_resize_factor, order=3) 
-        # print(ct_array.shape)
-        # assert 1>3
         # 对gt插值不应该使用高级插值方式，这样会破坏边界部分,检查数据输出很重要！！！
         # 使用order=0 nearst差值可确保zoomed seg unique = [0,1,2]
         seg_array = ndimage.zoom(seg_array, real_resize_factor, order=0)
         # print('new space', new_spacing) # [0.8, 0.8, 1.5]
         # print('zoomed shape:', ct_array.shape, ',', seg_array.shape) # (461, 540, 540) , (461, 540, 540)
+        '''
 
         # step2 :get mask effective range(startpostion:endpostion) z轴只取含有liver/liver tumor的帧
         pred_liver = seg_array.copy()
         pred_liver[pred_liver>0] = 1
         bb = find_bb(pred_liver) # liver和tumor都是liver
+        # print("bb: ", bb[0], bb[1])
         # ct_array = ct_array[bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]]
         # seg_array = seg_array[bb[0]:bb[1],bb[2]:bb[3],bb[4]:bb[5]]
         ## 做448*448切割
@@ -330,32 +350,55 @@ if __name__ == '__main__':
 
     print('Time {:.3f} min'.format((time.time() - start_time) / 60))
     print(time.strftime('%Y/%m/%d-%H:%M:%S', time.localtime()))
-    # """
+    assert 1>4
+    """
 
-    # """
     ## test the saved np
     ### 3d images
     # savedct_path = '/home/jzw/data/LiTS/LITS17/train_image3d_jzw/*'
     # savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask3d_jzw/*'
     # savedct_path = '/home/jzw/data/LiTS/LITS17/train_image_224*224/*'
     # savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask_224*224/*'
-    savedct_path = '/home/jzw/data/LiTS/LITS17/train_image_352*352/*'
-    savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask_352*352/*'
+    # savedct_path = '/home/jzw/data/LiTS/LITS17/train_image_352*352/*'
+    # savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask_352*352/*'
+    # savedct_path = '/home/jzw/data/LiTS/LITS17/train_image_352*352_nospacing/*' # 19080条
+    savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask_352*352_nospacing/*' # 19080条
+    savedct_path = '/home/jzw/data/LiTS/LITS17/train_image_352*352_no-9/*'
+    # savedseg_path = '/home/jzw/data/LiTS/LITS17/train_mask_352*352_no-9/*'
     from glob import glob
     ct_paths = glob(savedct_path)
     seg_paths = glob(savedseg_path)
     print(len(ct_paths), len(seg_paths))
     tn = 0
-    # for path in ct_paths[:5]:
-    #     # if "slice-1" in path:
-    #     x = np.load(path) 
-    #     print(x.shape, x.min(), x.max(), x.mean())
-    #     # if x.shape != (1, 352, 352):
-    #     #     tn += 1
-    # print(f"{tn} / {len(ct_paths)}")
-    print("seg:")
-    for path in seg_paths[:5]:
+    for path in ct_paths[:5]:
         # if "slice-1" in path:
         x = np.load(path) 
         print(x.shape, x.min(), x.max(), x.mean())
+        # if x.shape != (1, 352, 352):
+        #     tn += 1
+    print(f"{tn} / {len(ct_paths)}")
+    ## 检查保存的npy数据
+    print("test seg npy")
+    # for path in tqdm(seg_paths):
+    for path in tqdm(seg_paths[:10]):
+        # seg_name = Path(path).stem
+        # seg_volume_num = seg_name.split("_")[0]
+        # if seg_volume_num != "seg-130":
+        #     continue
+
+        x = np.load(path) 
+        print(x.shape)
+
+        ## 测试mask是否只有0,1,2
+        # xu = set(np.unique(x))
+        # if xu != set([0, 1]) and xu != set([0, 1, 2]):
+        #     print(xu, path)
+
+        ## 可视化保存的seg.npy
+        visual_dir = Path("/home/jzw/data/LiTS/LITS17/visual/train_image_352*352_nospacing")
+        visual_dir.mkdir(parents=True, exist_ok=True)
+        saved_seg = (x.transpose(1, 2, 0) * 127.0).astype(np.uint8)
+        # print(saved_seg.shape, type(saved_seg), np.unique(saved_seg))
+        # cv2.imwrite(str(visual_dir / f"{seg_name}.png"), saved_seg)
+        # assert 1>3
     # """

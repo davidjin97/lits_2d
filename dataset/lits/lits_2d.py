@@ -30,17 +30,21 @@ class LitsDataset(Dataset):
     def __getitem__(self, idx):
         img_path = str(self.img_paths[idx])
         mask_path = str(self.mask_paths[idx])
+        # seg_volume_num = seg_name.split("_")[0]
         # print(img_path)
         # print(mask_path)
         npimage = np.load(img_path) # (1, 224, 224)
         npmask = np.load(mask_path) # (1, 224, 224) 0表示背景，1表示肝脏，2表示肝脏肿瘤
-        npimage = npimage.transpose((2, 0, 1))[:1, :, :]
-        npmask = npmask[np.newaxis, :, :]
+        # print(npimage.shape)
+        # print(npmask.shape)
+        # npimage = npimage.transpose((2, 0, 1))[:1, :, :]
+        # npmask = npmask[np.newaxis, :, :]
         # print(f"npimage0: {npimage.shape}, {npimage.min()}, {npimage.max()}, {npimage.mean()}")
         # print(f"npmask: {npmask.shape}, {npmask.min()}, {npmask.max()}, {npmask.mean()}")
+        # assert 1>8
 
-        npimage = npimage[0, :, :, np.newaxis] # (224, 224, 1)
-        npimage = npimage.transpose((2, 0, 1)) # (1, 224, 224)
+        # npimage = npimage[0, :, :, np.newaxis] # (224, 224, 1)
+        # npimage = npimage.transpose((2, 0, 1)) # (1, 224, 224)
 
         npmask = npmask[0, :, :]
 
@@ -54,17 +58,19 @@ class LitsDataset(Dataset):
         tumor_label[npmask == 2] = 1
 
         _, h, w = npimage.shape
-        nplabel = np.empty((w, h, 2))
+        nplabel = np.empty((2, w, h))
 
-        nplabel[:, :, 0] = liver_label
-        nplabel[:, :, 1] = tumor_label
+        nplabel[0, :, :] = liver_label
+        nplabel[1, :, :] = tumor_label
 
-        nplabel = nplabel.transpose((2, 0, 1))
+        # nplabel = nplabel.transpose((2, 0, 1))
 
         nplabel = nplabel.astype("float32")
         npimage = npimage.astype("float32")
+        # print(npimage.shape ,nplabel.shape)
 
-        return npimage, nplabel # (1, 224, 224), (2, 224, 224)
+        return npimage, nplabel, img_path # (1, 224, 224), (2, 224, 224)
+        # return npimage, nplabel[1:, :, :] # 只有tumor的mask(1, 224, 224), (1, 224, 224)
     
     def get_data_paths(self):
         img_paths = list(self.img_root.iterdir())
@@ -216,30 +222,51 @@ if __name__ == '__main__':
         assert 1>3
     """
     args = {}
+
     # img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
-    img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image2d/*')
+    # img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image2d/*')
+    img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352_nospacing/*')
+    # for p in img_paths:
+    #     print(Path(p).stem)
+    #     assert 1>2
+    img_paths = [p for p in img_paths if "slice-130" in Path(p).stem]
+    # print(len(img_paths))
+    # assert 1>4
+
     dataset = LitsDataset(args, img_paths)
     # dataset = LitsDataSet(args, img_root, mask_root)
     data_loader=DataLoader(dataset=dataset, batch_size=1, num_workers=0, shuffle=False)
     # for batch_idx, (data, target, fullImg) in enumerate(data_loader):
     # device = torch.device("cuda:0")
-    visual_directory = Path("./dataset/lits/visual")
-    visual_directory.mkdir(parents=True, exist_ok=True)
-    for batch_idx, (image, mask) in enumerate(data_loader):
-        if batch_idx > 10:
-            break
-        # image[image == -9] = 0.5
+
+    # visual_directory = Path("./dataset/lits/visual/train_image_352*352_nospacing")
+    visual_directory = Path("./visual/train_image_352*352_nospacing")
+    visual_directory.mkdir(parents=True, exist_ok=True) # ----------------------------------<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    # print(visual_directory)
+    # assert 1>4
+
+    for batch_idx, (image, mask, img_path) in enumerate(data_loader):
+        # print(image.shape, mask.shape)
+        # print(img_path[0])
+        img_name = Path(img_path[0]).stem
+        img_num = img_name.split("-")[1]
+        # print(img_name, img_num)
+        # if batch_idx > 2:
+        #     break
         # image = image.to(device)
         # mask = mask.to(device)
         
         # target = to_one_hot_3d(target.long())
-        print(f"image: {image.shape}, {image.min()}, {image.max()}, {image.mean()}")
-        print(f"mask: {mask.shape}, {mask.min()}, {mask.max()}, {mask.mean()}")
+        # print(f"image: {image.shape}, {image.min()}, {image.max()}, {image.mean()}")
+        # print(f"mask: {mask.shape}, {mask.min()}, {mask.max()}, {mask.mean()}")
 
-        # visual
-        # saved_img = (image[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
-        # cv2.imwrite(str(visual_directory / f"{str(batch_idx)}_img.png"), saved_img)
-        # saved_mask0 = (mask[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
-        # cv2.imwrite(str(visual_directory / f"{str(batch_idx)}_liver_mask.png"), saved_mask0)
-        # saved_mask1 = (mask[0][1:2].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
-        # cv2.imwrite(str(visual_directory / f"{str(batch_idx)}_tumor_mask.png"), saved_mask1)
+        ## 可视化img和mask
+        saved_img = (image[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
+        # print(saved_img.min(), saved_img.max(), saved_img.mean())
+        cv2.imwrite(str(visual_directory / f"{img_num}_img.png"), saved_img)
+        saved_mask0 = (mask[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
+        # print(np.unique(saved_mask0))
+        cv2.imwrite(str(visual_directory / f"{img_num}_liver_mask.png"), saved_mask0)
+        saved_mask1 = (mask[0][1:2].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
+        # print(np.unique(saved_mask1))
+        cv2.imwrite(str(visual_directory / f"{img_num}_tumor_mask.png"), saved_mask1)
