@@ -22,16 +22,16 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 
 from net_builder import build_net
-# from loss.loss impojrt FocalLoss2d
-from evaluate.metric import iou_score, dice_coef
+# from loss.loss import FocalLoss
+from loss.focal_loss import FocalLoss
+# from evaluate.metric import iou_score, dice_coef, dice_coef_one
 from evaluate import metric
-# from utils.torchsummary import summary
+from evaluate.metric import get_metric
 
 from dataset.lits.dataset import Dataset
 from dataset.lits.lits_2d import LitsDataset
 
 logger = logging.getLogger('global')
-
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -103,8 +103,9 @@ class SegTrainer(object):
     def _prepare_dataset(self):
         if not self.opt.evaluate:
             # img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
-            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image2d/*')
             # mask_paths = glob('/home/jzw/data/LiTS/LITS17/train_mask_224*224/*')
+            # img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image2d/*')
+            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352_nospacing/*')
             if self.opt.debug:
                 img_paths = img_paths[:20]
                 # mask_paths = mask_paths[:20]
@@ -130,7 +131,7 @@ class SegTrainer(object):
                                             pin_memory=True, sampler=val_sampler)
             logger.info('val with {} pair images'.format(self.n_val_img))
         else:
-            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352/*')
+            img_paths = glob('/home/jzw/data/LiTS/LITS17/train_image_352*352_nospacing/*')
             train_img_paths, test_img_paths= \
                 train_test_split(img_paths, test_size=0.3, random_state=self.opt.manualSeed)
             test_dataset = LitsDataset(self.opt, test_img_paths)
@@ -166,10 +167,8 @@ class SegTrainer(object):
         # construct loss function
         if self.opt.loss.type == 'multi_scale':
             self.loss_function = MultiScaleLoss(**self.opt.loss.kwargs)
-        elif self.opt.loss.type == 'focal2d':
-            self.loss_function = FocalLoss2d(**self.opt.loss.kwargs)
-        elif self.opt.loss.type == 'focal3d':
-            self.loss_function = FocalLoss3d()
+        elif self.opt.loss.type == 'focal':
+            self.loss_function = FocalLoss()
         elif self.opt.loss.type == 'kl':
             self.loss_function = nn.KLDivLoss()
         elif self.opt.loss.type == 'l1':
@@ -197,9 +196,10 @@ class SegTrainer(object):
 
         for epoch in range(self.opt.train_epoch):
             losses = AverageMeter()
-            ious = AverageMeter()
-            dices_1s = AverageMeter()
-            dices_2s = AverageMeter()
+            liver_dscs = AverageMeter()
+            liver_mious = AverageMeter()
+            tumor_dscs = AverageMeter()
+            tumor_mious = AverageMeter()
 
             epoch_iters = len(self.train_loader)
             for iter_train, (image, mask) in enumerate(self.train_loader):
@@ -207,55 +207,59 @@ class SegTrainer(object):
                 mask = mask.to(self.opt.rank)
 
                 output = self.net(image)
+
                 # if self.opt.rank == 0:
                 #     print(f"image: {image.shape}, {image.min()}, {image.max()}, {image.mean()}")
                 #     print(f"mask: {mask.shape}, {mask.min()}, {mask.max()}, {mask.mean()}")
                 #     print(f"output: {output.shape}, {output.min()}, {output.max()}, {output.mean()}")
 
                 loss = self.loss_function(output, mask)
-                iou = iou_score(output, mask) 
-                dice_1 = dice_coef(output, mask)[0]
-                dice_2 = dice_coef(output, mask)[1]
+
+                liver_dsc, liver_miou, liver_acc, liver_ppv, liver_sen, liver_hd = get_metric(output.detach()[:, 0, :, :], mask.detach()[:, 0, :, :], self.opt.thr)
+                tumor_dsc, tumor_miou, tumor_acc, tumor_ppv, tumor_sen, tumor_hd = get_metric(output.detach()[:, 1, :, :], mask.detach()[:, 1, :, :], self.opt.thr)
 
                 losses.update(loss.item(), image.shape[0])
-                ious.update(iou, image.shape[0])
-                dices_1s.update(dice_1, image.shape[0])
-                dices_2s.update(dice_2, image.shape[0])
+
+                liver_dscs.update(liver_dsc, image.shape[0])
+                liver_mious.update(liver_miou, image.shape[0])
+                tumor_dscs.update(tumor_dsc, image.shape[0])
+                tumor_mious.update(tumor_miou, image.shape[0])
 
                 # compute gradient and do optimizing step
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
-                logger.info(f'Training Epoch: {epoch+1}/{self.opt.train_epoch},iter: {iter_train+1}/{epoch_iters}, the loss is {loss.item()}')
+                logger.info(f'Training Epoch: {epoch+1}/{self.opt.train_epoch},iter: {iter_train+1}/{epoch_iters}, the loss is {loss.item()}, liver_dsc:{liver_dsc}, tumor_dsc:{tumor_dsc}, out_min:{output.min()}, out_max:{output.max()}, out_mean:{output.mean()}')
                
             self.lr_scheduler.step()
 
             if self.opt.rank == 0:
                 self.writer.add_scalar(f'loss/train_epoch', losses.avg, epoch) # 平均每条数据的loss，即batch=1
-                self.writer.add_scalar(f'iou/train_epoch', ious.avg, epoch)
-                self.writer.add_scalar(f'dice_1/train_epoch', dices_1s.avg, epoch)
-                self.writer.add_scalar(f'dice_2/train_epoch', dices_2s.avg, epoch)
+                self.writer.add_scalar(f'liver_dscs/train_epoch', liver_dscs.avg, epoch)
+                self.writer.add_scalar(f'liver_mious/train_epoch', liver_mious.avg, epoch)
+                self.writer.add_scalar(f'tumor_dscs/train_epoch', tumor_dscs.avg, epoch)
+                self.writer.add_scalar(f'tumor_mious/train_epoch', tumor_mious.avg, epoch)
 
             logger.info(f'Start evalute at Epoch: {epoch+1}/{self.opt.train_epoch}')
             val_res = self.val(epoch)
 
             saved_trigger += 1 
             if self.opt.rank == 0:
-                if epoch >= int(self.opt.train_epoch // 2) and epoch not in saved_epoch and val_res["loss"] < best_loss:
-                    saved_epoch.add(epoch)
-                    saved_trigger = 0
-                    self.save_checkpoint({'epoch': self.opt.train_epoch,
-                                        'arch': self.opt.net_name,
-                                        'state_dict': self.net.state_dict(),
-                                        }, f'epoch_{epoch+1}_model_best_loss.pth')
-                if epoch >= int(self.opt.train_epoch // 2) and epoch not in saved_epoch and val_res["iou"] > best_iou:
-                    saved_epoch.add(epoch)
-                    saved_trigger = 0
-                    self.save_checkpoint({'epoch': self.opt.train_epoch,
-                                        'arch': self.opt.net_name,
-                                        'state_dict': self.net.state_dict(),
-                                        }, f'epoch_{epoch+1}_model_best_iou.pth')
+                # if epoch >= int(self.opt.train_epoch // 2) and epoch not in saved_epoch and val_res["loss"] < best_loss:
+                #     saved_epoch.add(epoch)
+                #     saved_trigger = 0
+                #     self.save_checkpoint({'epoch': self.opt.train_epoch,
+                #                         'arch': self.opt.net_name,
+                #                         'state_dict': self.net.state_dict(),
+                #                         }, f'epoch_{epoch+1}_model_best_loss.pth')
+                # if epoch >= int(self.opt.train_epoch // 2) and epoch not in saved_epoch and val_res["iou"] > best_iou:
+                #     saved_epoch.add(epoch)
+                #     saved_trigger = 0
+                #     self.save_checkpoint({'epoch': self.opt.train_epoch,
+                #                         'arch': self.opt.net_name,
+                #                         'state_dict': self.net.state_dict(),
+                #                         }, f'epoch_{epoch+1}_model_best_iou.pth')
                 if epoch not in saved_epoch and (epoch+1) % self.opt.save_every_epoch == 0:
                     saved_epoch.add(epoch)
                     self.save_checkpoint({'epoch': self.opt.train_epoch,
@@ -273,9 +277,10 @@ class SegTrainer(object):
     def val(self, epoch):
         self.net.eval()
         losses = AverageMeter()
-        ious = AverageMeter()
-        dices_1s = AverageMeter()
-        dices_2s = AverageMeter()
+        liver_dscs = AverageMeter()
+        liver_mious = AverageMeter()
+        tumor_dscs = AverageMeter()
+        tumor_mious = AverageMeter()
 
         with torch.no_grad():
             val_iters = len(self.val_loader)
@@ -286,30 +291,34 @@ class SegTrainer(object):
                 output = self.net(image) 
 
                 loss = self.loss_function(output, mask)
-                iou = iou_score(output, mask) 
-                dice_1 = dice_coef(output, mask)[0]
-                dice_2 = dice_coef(output, mask)[1]
+
+                liver_dsc, liver_miou, liver_acc, liver_ppv, liver_sen, liver_hd = get_metric(torch.sigmoid(output.detach()[:, 0, :, :]), mask.detach()[:, 0, :, :], self.opt.thr)
+                tumor_dsc, tumor_miou, tumor_acc, tumor_ppv, tumor_sen, tumor_hd = get_metric(torch.sigmoid(output.detach()[:, 1, :, :]), mask.detach()[:, 1, :, :], self.opt.thr)
 
                 losses.update(loss.item(), image.shape[0])
-                ious.update(iou, image.shape[0])
-                dices_1s.update(dice_1, image.shape[0])
-                dices_2s.update(dice_2, image.shape[0])
+
+                liver_dscs.update(liver_dsc, image.shape[0])
+                liver_mious.update(liver_miou, image.shape[0])
+                tumor_dscs.update(tumor_dsc, image.shape[0])
+                tumor_mious.update(tumor_miou, image.shape[0])
 
                 logger.info(f'Val iter: {iter_val+1}/{val_iters}, the loss is {loss.item()}')
 
             if self.opt.rank == 0:
                 self.writer.add_scalar(f'loss/val_epoch', losses.avg, epoch)
-                self.writer.add_scalar(f'iou/val_epoch', ious.avg, epoch)
-                self.writer.add_scalar(f'dice_1/val_epoch', dices_1s.avg, epoch)
-                self.writer.add_scalar(f'dice_2/val_epoch', dices_2s.avg, epoch)
+                self.writer.add_scalar(f'liver_dscs/val_epoch', liver_dscs.avg, epoch)
+                self.writer.add_scalar(f'liver_mious/val_epoch', liver_mious.avg, epoch)
+                self.writer.add_scalar(f'tumor_dscs/val_epoch', tumor_dscs.avg, epoch)
+                self.writer.add_scalar(f'tumor_mious/val_epoch', tumor_mious.avg, epoch)
 
         self.net.train()
 
         val_res = {
             'loss': losses.avg,
-            'iou': ious.avg,
-            'dice_1': dices_1s.avg,
-            'dice_2': dices_2s.avg
+            'liver_dscs': liver_dscs.avg,
+            'liver_mious': liver_mious.avg,
+            'tumor_dscs': tumor_dscs.avg,
+            'tumor_mious': tumor_mious.avg
         }
         return val_res
                 
@@ -322,6 +331,8 @@ class SegTrainer(object):
         # ious = AverageMeter()
         ious_1s = AverageMeter()
         ious_2s = AverageMeter()
+        mious_1s = AverageMeter()
+        mious_2s = AverageMeter()
         dices_1s = AverageMeter()
         dices_2s = AverageMeter()
 
@@ -339,8 +350,10 @@ class SegTrainer(object):
 
                 # print(output[0][1].min(), output[0][1].max(), output[0][1].mean())
                 # print(mask[0][1].min(), mask[0][1].max(), mask[0][1].mean())
-                iou_1 = metric.mean_iou(output[0][0], mask[0][0]) 
-                iou_2 = metric.mean_iou(output[0][1], mask[0][1]) 
+                miou_1 = metric.mean_iou(output[0][0], mask[0][0]) 
+                miou_2 = metric.mean_iou(output[0][1], mask[0][1]) 
+                iou_1 = metric.iou_score(output[0][0], mask[0][0]) 
+                iou_2 = metric.iou_score(output[0][1], mask[0][1]) 
                 # print(iou_1)
                 # print(iou_2)
                 # iou_1 = metric.iou_score(output[0][0], mask[0][0]) 
@@ -348,44 +361,50 @@ class SegTrainer(object):
                 # print(iou_1)
                 # print(iou_2)
                 # assert 1>4
-
                 dice_1 = metric.dice_coef(output, mask)[0]
                 dice_2 = metric.dice_coef(output, mask)[1]
 
+                mious_1s.update(miou_1, image.shape[0])
+                mious_2s.update(miou_2, image.shape[0])
                 ious_1s.update(iou_1, image.shape[0])
-                ious_2s.update(iou_2, image.shape[0])
+                ious_2s.update(iou_2, image.shape[0]) 
                 dices_1s.update(dice_1, image.shape[0])
                 dices_2s.update(dice_2, image.shape[0])
 
-                logger.info("Save visual images.")
-                print("Save visual images.")
-                if iter_test < 40:
+                # logger.info("Save visual images.")
+                # print("Save visual images.")
+                if True:#iter_test < 500:
                     # print(mask.shape)
-                    if mask[0][1:2].sum() > 0:
-                        print(mask[0][:1].sum())
-                        print(iter_test)
+                    if True:#mask[0][1:2].sum() > 0:
+                        logger.info(f"{output[0][:1].min()}, {output[0][:1].max()}, {output[0][1:2].min()}, {output[0][1:2].max()}")
+                        # print(mask[0][:1].sum())
+                        # print(iter_test)
                     # print(type(mask[0][:1]), mask[0][:1].shape)
                     # assert 1>4
                     # cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_img.png"), image[0][0])
                     # cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_liver_out.png"), output[0][0])
                         saved_mask0 = (mask[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
-                        cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_liver_mask.png"), saved_mask0)
+                        # cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_liver_mask.png"), saved_mask0)
                         saved_output0 = (output[0][:1].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8) 
-                        cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_liver_out.png"), saved_output0)
+                        # cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_liver_out.png"), saved_output0)
                         saved_mask1 = (mask[0][1:2].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8)
-                        cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_tumor_mask.png"), saved_mask1)
+                        # cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_tumor_mask.png"), saved_mask1)
                         saved_output1 = (output[0][1:2].permute(1, 2, 0) * 255.0).cpu().numpy().astype(np.uint8) 
-                        cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_tumor_out.png"), saved_output1)
-                        assert 1>4
+                        # uni = np.unique(saved_output1)
+                        # if set(uni) != {0}:
+                        #     logger.info(uni)
+                        # cv2.imwrite(str(Path(self.opt.visual_directory) / f"{str(iter_test)}_tumor_out.png"), saved_output1)
+                        # assert 1>4
 
                 # logger.info(f'Val iter: {iter_test+1}/{val_iters}, the loss is {loss.item()}')
         # print('*' * 15, self.model_name + ':', '*' * 15)
 
-        logger.info('*' * 15, "liver_mIoU:", ious_1s.avg, '*' * 15)
-        logger.info('*' * 15, "liver_DiceScore:", dices_1s.avg, '*' * 15)
-
-        logger.info('*' * 15, "tumor_mIoU:", ious_1s.avg, '*' * 15)
-        logger.info('*' * 15, "tumor_DiceScore:", dices_2s.avg, '*' * 15)
+        logger.info(f"{'*' * 15} liver_mIoU: {mious_1s.avg} {'*' * 15}")
+        logger.info(f"{'*' * 15} liver_IouScore: {ious_1s.avg} {'*' * 15}")
+        logger.info(f"{'*' * 15} liver_DiceScore: {dices_1s.avg} {'*' * 15}")
+        logger.info(f"{'*' * 15} tumor_mIoU: {mious_2s.avg} {'*' * 15}")
+        logger.info(f"{'*' * 15} tumor_IouScore: {ious_2s.avg} {'*' * 15}")
+        logger.info(f"{'*' * 15} tumor_DiceScore: {dices_2s.avg} {'*' * 15}")
 
     def save_checkpoint(self, state_dict, filename='checkpoint.pth'):
         torch.save(state_dict, os.path.join(self.opt.checkpoint_directory, filename))
