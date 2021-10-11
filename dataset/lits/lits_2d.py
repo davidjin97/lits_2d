@@ -69,7 +69,7 @@ class LitsDataset(Dataset):
         npimage = npimage.astype("float32")
         # print(npimage.shape ,nplabel.shape)
 
-        return npimage, nplabel, img_path # (1, 224, 224), (2, 224, 224)
+        return npimage, nplabel#, img_path # (1, 224, 224), (2, 224, 224)
         # return npimage, nplabel[1:, :, :] # 只有tumor的mask(1, 224, 224), (1, 224, 224)
     
     def get_data_paths(self):
