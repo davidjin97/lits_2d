@@ -7,15 +7,15 @@ net_name: 'SEUnet'
 # depth: 24
 
 pretrain_model: '' # /home/xzy/projects/BrainSeg/checkpoints/BrainSeg/Unet3D/epoch_85_model_final.pth
-# resume_model: '/home/xzy/projects/BrainSeg/checkpoints/BrainSeg/Unet3D/epoch_85_model_final.pth'
+resume_model: '' #'/home/jzw/workspace_seg/template_seg_jzw/runs/lits_seg/seunet/train/2021-09-28-09-08-42/checkpoints/epoch_85_model.pth'
 input_height: 352
 input_width: 352
 
-train_epoch : 100
-save_every_epoch : 5
+train_epoch : 200
+save_every_epoch : 1
 early_stop: 20
 # change the batchsize on each GPU
-batch_size: 2 # 32 
+batch_size: 8 # 32 
 print_freq : 100
 last_iter : -1 
 augment: True
@@ -47,6 +47,8 @@ lr_scheduler:
 
 loss:
   type: 'bcel'
+  # type: 'focal2d'
   # kwargs:
   #   class_num: 2
 
+thr: 0.55

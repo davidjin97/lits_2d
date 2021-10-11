@@ -12,10 +12,10 @@ input_height: 352
 input_width: 352
 
 train_epoch : 100
-save_every_epoch : 5
+save_every_epoch : 1
 early_stop: 20
 # change the batchsize on each GPU
-batch_size: 6 # 32 
+batch_size: 10 # 32 
 print_freq : 100
 last_iter : -1 
 augment: True
@@ -46,7 +46,8 @@ lr_scheduler:
   last_epoch: -1       
 
 loss:
-  type: 'bcel'
+  type: 'bcel' #'focal' 
   # kwargs:
   #   class_num: 2
 
+thr: 0.5
