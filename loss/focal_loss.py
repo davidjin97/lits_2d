@@ -66,30 +66,30 @@ class FocalLoss(nn.Module):
     def __init__(self): # 如果没有init方法,实例刚创建时就是一个简单的空的命名空间
         super(FocalLoss, self).__init__()
          
-    def forward(self, classifications, targets):
-        if classifications.dim()>2:
-            classifications = classifications.view(classifications.size(0),classifications.size(1),-1)  # N,C,H,W => N,C,H*W
-            classifications = classifications.transpose(1,2)    # N,C,H*W => N,H*W,C
-            classifications = classifications.contiguous().view(-1,classifications.size(2))   # N,H*W,C => N*H*W,C
+    def forward(self, outputs, targets):
+        if outputs.dim()>2:
+            outputs = outputs.view(outputs.size(0),outputs.size(1),-1)  # N,C,H,W => N,C,H*W
+            outputs = outputs.transpose(1,2)    # N,C,H*W => N,H*W,C
+            outputs = outputs.contiguous().view(-1,outputs.size(2))   # N,H*W,C => N*H*W,C
             targets = targets.view(targets.size(0),targets.size(1),-1)  # N,C,H,W => N,C,H*W
             targets = targets.transpose(1,2)    # N,C,H*W => N,H*W,C
             targets = targets.contiguous().view(-1,targets.size(2))   # N,H*W,C => N*H*W,C
-        # classifications = nn.Sigmoid()(classifications)
-        # print(classifications.shape, targets.shape) # torch.Size([4, 2, 256, 256]) torch.Size([4, 2, 256, 256])
-        # print(torch.unique(classifications), torch.unique(targets)) # torch.Size([4, 2, 256, 256]) torch.Size([4, 2, 256, 256])
+        # outputs = nn.Sigmoid()(outputs)
+        # print(outputs.shape, targets.shape) # torch.Size([4, 2, 256, 256]) torch.Size([4, 2, 256, 256])
+        # print(torch.unique(outputs), torch.unique(targets)) # torch.Size([4, 2, 256, 256]) torch.Size([4, 2, 256, 256])
         # alpha = 0.5 # 控制样本均衡 0.5相当于关掉此功能
         alpha = 0.25 # 论文中0.25 works best
         gamma = 2.0 # 控制难易程度学习 难学习的loss更大
         SMOOTH = 1e-4
-        # classifications =  (classifications.squeeze(1)).squeeze(0) # DHW
+        # outputs =  (outputs.squeeze(1)).squeeze(0) # DHW
         # targets = (targets.squeeze(1)).squeeze(0) #DHW
-        channels = classifications.shape[1]
+        channels = outputs.shape[1]
         channel_losses = []
-        # print(classifications.shape, targets.shape)
+        # print(outputs.shape, targets.shape)
         for c in range(channels):
-            classification = classifications[:, c] # N*H*W
+            output = outputs[:, c] # N*H*W
             target = targets[:, c]
-            # print(classification.shape, target.shape)
+            # print(output.shape, target.shape)
             alpha_factor = torch.ones(target.shape).to(target.device) * alpha
 
             # 用两个where 来完成
@@ -97,19 +97,19 @@ class FocalLoss(nn.Module):
             # print(alpha_factor.shape, alpha_factor.unique())
 
             focal_weight = torch.where( 
-                torch.eq(target, 1.), 1. - classification, classification)
+                torch.eq(target, 1.), 1. - output, output)
             focal_weight = alpha_factor * torch.pow(focal_weight, gamma) #αt(1 − pt)γ
             # print(focal_weight.shape)
-            bce = -(target * torch.log(classification + SMOOTH) +(1.0 - target) * torch.log(1.0 - classification + SMOOTH))
+            bce = -(target * torch.log(output + SMOOTH) +(1.0 - target) * torch.log(1.0 - output + SMOOTH))
             # print(bce.shape)
             # print(target[:10])
-            # print(classification[:10])
+            # print(output[:10])
             # print(bce[:10])
             channel_focal_loss = focal_weight * bce
             # print(channel_focal_loss.shape)
             # print(type(channel_focal_loss.mean()), channel_focal_loss.mean())
             channel_losses.append(channel_focal_loss.mean())
-        # return torch.stack(classification_losses).mean(dim=0, keepdim=True)
+        # return torch.stack(output).mean(dim=0, keepdim=True)
         # print(torch.stack(channel_losses))
         return torch.stack(channel_losses).mean(dim=0)
 # '''

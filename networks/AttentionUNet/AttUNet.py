@@ -282,7 +282,7 @@ class AttU_Net(nn.Module):
     Attention Unet implementation
     Paper: https://arxiv.org/abs/1804.03999
     """
-    def __init__(self, img_ch=3, output_ch=1):
+    def __init__(self, in_channels=1, out_channels=2):
         super(AttU_Net, self).__init__()
 
         n1 = 64
@@ -293,7 +293,7 @@ class AttU_Net(nn.Module):
         self.Maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.Maxpool4 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.Conv1 = conv_block(img_ch, filters[0])
+        self.Conv1 = conv_block(in_channels, filters[0])
         self.Conv2 = conv_block(filters[0], filters[1])
         self.Conv3 = conv_block(filters[1], filters[2])
         self.Conv4 = conv_block(filters[2], filters[3])
@@ -315,7 +315,7 @@ class AttU_Net(nn.Module):
         self.Att2 = Attention_block(F_g=filters[0], F_l=filters[0], F_int=32)
         self.Up_conv2 = conv_block(filters[1], filters[0])
 
-        self.Conv = nn.Conv2d(filters[0], output_ch, kernel_size=1, stride=1, padding=0)
+        self.Conv = nn.Conv2d(filters[0], out_channels, kernel_size=1, stride=1, padding=0)
 
         self.active = torch.nn.Sigmoid()
 
@@ -787,7 +787,7 @@ class UNet(nn.Module):
 '''
 
 if __name__ == "__main__":
-    gpu_ids = "2, 3"
+    gpu_ids = "3"
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ids
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_ids = list(range(torch.cuda.device_count()))

@@ -14,7 +14,7 @@ SUPPORT_NETS = {
                 'Unet3d': Unet3D,
                 'UNet': UNet,
                 'ResUnet': ResUnet,
-                'AttUNet': AttU_Net,
+                'AttUnet': AttU_Net,
                 'SEUnet': SEUnet,
                 # '3dresidual_unet': ResidualUNet3D,
                 # 'AMEA_deepvision': AMEA_deepvision_res2block,
