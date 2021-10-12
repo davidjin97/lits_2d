@@ -272,9 +272,15 @@ class Attention_block(nn.Module):
     def forward(self, g, x):
         g1 = self.W_g(g)
         x1 = self.W_x(x)
+        # print('x1:', x1.shape)
+        # print('g1:', g1.shape)
         psi = self.relu(g1 + x1)
+        # print('psi:', psi.shape)
         psi = self.psi(psi)
-        out = x * psi
+        # print('psi:', psi.shape)
+        out = x * psi # spatial attention
+        # print('x:', x.shape)
+        # print('out:', out.shape)
         return out
 
 class AttU_Net(nn.Module):
@@ -338,9 +344,12 @@ class AttU_Net(nn.Module):
 
         #print(x5.shape)
         d5 = self.Up5(e5)
-        #print(d5.shape)
+        # print('e4:', e4.shape)
+        # print('d5:', d5.shape)
         x4 = self.Att5(g=d5, x=e4)
+        # print('x4:', x4.shape)
         d5 = torch.cat((x4, d5), dim=1)
+        # print('d5:', d5.shape)
         d5 = self.Up_conv5(d5)
 
         d4 = self.Up4(d5)
@@ -357,6 +366,7 @@ class AttU_Net(nn.Module):
         x1 = self.Att2(g=d2, x=e1)
         d2 = torch.cat((x1, d2), dim=1)
         d2 = self.Up_conv2(d2)
+        # print('d2:', d2.shape)
 
         out = self.Conv(d2)
 
@@ -787,7 +797,7 @@ class UNet(nn.Module):
 '''
 
 if __name__ == "__main__":
-    gpu_ids = "3"
+    gpu_ids = "2"
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ids
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_ids = list(range(torch.cuda.device_count()))
@@ -798,7 +808,7 @@ if __name__ == "__main__":
         model = torch.nn.DataParallel(model, device_ids=device_ids)
 
     # input = torch.randn((2, 1, 64, 128, 160)).to(device) # BCDHW
-    input = torch.randn(4, 1, 352, 352).to(device) # BCHW 
+    input = torch.randn(1, 1, 256, 256).to(device) # BCHW 
     output = model(input)
 
     print("input.shape: ", input.shape)
