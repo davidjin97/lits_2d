@@ -21,9 +21,13 @@ class DiceLoss(nn.Module):
 
 if __name__ == "__main__":
     loss = DiceLoss()
-    inputs = torch.randn(4,2,512,512).sigmoid()
-    targets = torch.rand(4,2,512,512).ge(0.4).int()
+    # inputs = torch.randn(4,1,512,512).sigmoid().to('cuda:2)
+    outputs = torch.randn(1,2,256,256).sigmoid().float().to('cuda:2')
+    targets = torch.rand(1,2,256,256).ge(0.2).int().float().to('cuda:2')
+    val = nn.BCEWithLogitsLoss()(outputs, targets)
+    nn.BCEWithLogitsLoss
+    print(val)
+
+    # print(outputs.min(), outputs.max(), outputs.mean())
     # targets = torch.rand(10).ge(0.4).int()
     # bce = loss(targets, inputs)
-    val = loss(inputs, targets)
-    print(val)

@@ -58,7 +58,7 @@ class LitsDataset(Dataset):
         tumor_label[npmask == 2] = 1
 
         _, h, w = npimage.shape
-        nplabel = np.empty((2, w, h))
+        nplabel = np.empty((2, h, w))
 
         nplabel[0, :, :] = liver_label
         nplabel[1, :, :] = tumor_label
@@ -83,6 +83,88 @@ class LitsDataset(Dataset):
         mask_paths = list(map(lambda x: Path(str(x).replace('image', 'mask').replace('slice', 'seg')), img_paths))# .replace('slice', 'seg')
         # print(mask_paths[0].exists())
         # assert 1>4
+        return img_paths, mask_paths 
+
+class LitsLiverDataset(Dataset):
+    def __init__(self, args, img_paths):
+        self.args = args
+        self.img_paths = img_paths
+        self.mask_paths = list(map(lambda x: x.replace('image', 'mask').replace('slice','seg'), self.img_paths))
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, idx):
+        img_path = str(self.img_paths[idx])
+        mask_path = str(self.mask_paths[idx])
+
+        npimage = np.load(img_path) # (1, 224, 224)
+        npmask = np.load(mask_path) # (1, 224, 224) 0表示背景，1表示肝脏，2表示肝脏肿瘤
+
+        # npimage = npimage[0, :, :, np.newaxis] # (224, 224, 1)
+        # npimage = npimage.transpose((2, 0, 1)) # (1, 224, 224)
+
+        npmask = npmask[0, :, :]
+
+        # 只提取liver
+        liver_label = npmask.copy()
+        liver_label[npmask == 2] = 1
+        liver_label[npmask == 1] = 1
+
+        _, h, w = npimage.shape
+        nplabel = np.empty((1, h, w))
+
+        nplabel[0, :, :] = liver_label
+
+        nplabel = nplabel.astype("float32")
+        npimage = npimage.astype("float32")
+
+        return npimage, nplabel#, img_path # (1, 224, 224), (2, 224, 224)
+    
+    def get_data_paths(self):
+        img_paths = list(self.img_root.iterdir())
+        mask_paths = list(map(lambda x: Path(str(x).replace('image', 'mask').replace('slice', 'seg')), img_paths))# .replace('slice', 'seg')
+        return img_paths, mask_paths 
+
+class LitsTumorDataset(Dataset):
+    def __init__(self, args, img_paths):
+        self.args = args
+        self.img_paths = img_paths
+        self.mask_paths = list(map(lambda x: x.replace('image', 'mask').replace('slice','seg'), self.img_paths))
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, idx):
+        img_path = str(self.img_paths[idx])
+        mask_path = str(self.mask_paths[idx])
+
+        npimage = np.load(img_path) # (1, 224, 224)
+        npmask = np.load(mask_path) # (1, 224, 224) 0表示背景，1表示肝脏，2表示肝脏肿瘤
+
+        # npimage = npimage[0, :, :, np.newaxis] # (224, 224, 1)
+        # npimage = npimage.transpose((2, 0, 1)) # (1, 224, 224)
+
+        npmask = npmask[0, :, :]
+
+        # 只提取tumor
+        tumor_label = npmask.copy()
+        tumor_label[npmask == 2] = 1
+        tumor_label[npmask == 1] = 0
+
+        _, h, w = npimage.shape
+        nplabel = np.empty((1, h, w))
+
+        nplabel[0, :, :] = tumor_label
+
+        nplabel = nplabel.astype("float32")
+        npimage = npimage.astype("float32")
+
+        return npimage, nplabel#, img_path # (1, 224, 224), (2, 224, 224)
+    
+    def get_data_paths(self):
+        img_paths = list(self.img_root.iterdir())
+        mask_paths = list(map(lambda x: Path(str(x).replace('image', 'mask').replace('slice', 'seg')), img_paths))# .replace('slice', 'seg')
         return img_paths, mask_paths 
 
 '''

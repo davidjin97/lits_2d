@@ -84,8 +84,8 @@ class SEUnet(nn.Module):
         c9 = self.conv9(merge9)
         se2 = self.se2(c9)
         c10 = self.conv10(se2)
-        out = nn.Sigmoid()(c10)
-        return out
+        # out = nn.Sigmoid()(c10)
+        return c10
 
 
 if __name__ == "__main__":

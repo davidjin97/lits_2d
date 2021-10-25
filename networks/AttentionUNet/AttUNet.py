@@ -370,7 +370,7 @@ class AttU_Net(nn.Module):
 
         out = self.Conv(d2)
 
-        out = self.active(out)
+        # out = self.active(out)
 
         return out
 

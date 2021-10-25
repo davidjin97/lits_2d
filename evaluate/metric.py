@@ -189,35 +189,37 @@ class IOUMetric:
         return Accuracy, mIoU
 
 def dice_coef(output, target):
-    # if torch.is_tensor(output):
-    #     output = output.cpu().numpy()
-    # if torch.is_tensor(target):
-    #     target = target..cpu().numpy()
     intersection = (output * target).sum()
     # print(f"{intersection}/{output.sum()}+{target.sum()}")
     return (2. * intersection + SMOOTH) / \
         (output.sum() + target.sum() + SMOOTH)
 
+def iou_score(output, target):
+    output_ = output.astype(bool)
+    target_ = target.astype(bool)
+    intersection = (output_ & target_).sum()
+    union = (output_ | target_).sum()
+    iou = (intersection + SMOOTH) / (union + SMOOTH)
+    return iou
+
 def accuracy(output, target):
+    """ 在所有像素中，判断正确的比例 """
     return (output == target).sum() / len(output.flatten())
 
 def ppv(output, target):
-    # smooth = 1e-5
-    # if torch.is_tensor(output):
-    #     output = torch.sigmoid(output).data.cpu().numpy()
-    # if torch.is_tensor(target):
-    #     target = target.data.cpu().numpy()
+    """
+    你预测的肿瘤像素中，有多少是真的肿瘤 (precision)
+    """
     intersection = (output * target).sum()
     return  (intersection + SMOOTH) / \
            (output.sum() + SMOOTH)
 
 def sensitivity(output, target):
-    # smooth = 1e-5
-    # if torch.is_tensor(output):
-    #     output = torch.sigmoid(output).data.cpu().numpy()
-    # if torch.is_tensor(target):
-    #     target = target.data.cpu().numpy()
-
+    """
+    肿瘤像素中有多少是被找了出来 (recall)
+    output shape: [h, w]
+    target shape: [h, w]
+    """
     intersection = (output * target).sum()
     return (intersection + SMOOTH) / \
         (target.sum() + SMOOTH)
@@ -242,23 +244,25 @@ def get_metric(predict, mask, thr):
     mask = mask.astype(np.int16)
 
     m_dsc = []
-    m_iou = []
-    m_acc = []
     m_ppv = []
     m_sen = []
+    m_acc = []
+    m_iou = []
     m_hd = []
 
     for b in range(batch_size):
         m_dsc.append(dice_coef(predict[b], mask[b]))
         m_ppv.append(ppv(predict[b], mask[b]))
         m_sen.append(sensitivity(predict[b], mask[b]))
+        m_acc.append(accuracy(predict[b], mask[b]))
+        m_iou.append(iou_score(predict[b], mask[b]))
         m_hd.append(hausdorff_distance(predict[b], mask[b]))
 
-        Iou = IOUMetric(2)
-        Iou.add_batch(predict[b], mask[b])
-        acc, miou = Iou.evaluate() 
-        m_iou.append(miou)
-        m_acc.append(acc)
+        # Iou = IOUMetric(2)
+        # Iou.add_batch(predict[b], mask[b])
+        # acc, miou = Iou.evaluate() 
+        # m_iou.append(miou)
+        # m_acc.append(acc)
 
     return np.nanmean(m_dsc), np.nanmean(m_iou), np.nanmean(m_acc), np.nanmean(m_ppv), np.nanmean(m_sen), np.nanmean(m_hd)
 
