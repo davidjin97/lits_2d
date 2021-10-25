@@ -6,6 +6,8 @@ from networks.UNet import UNet
 from networks.ResUnet.ResUnet import ResUnet
 from networks.AttentionUNet.AttUNet import AttU_Net
 from networks.SEUnet import SEUnet
+from networks.TransUNet.vit_seg_modeling import VisionTransformer as ViT_seg
+from networks.TransUNet.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 
 import logging
 logger = logging.getLogger('global')
@@ -16,6 +18,7 @@ SUPPORT_NETS = {
                 'ResUnet': ResUnet,
                 'AttUnet': AttU_Net,
                 'SEUnet': SEUnet,
+                'TransUNet': (ViT_seg, CONFIGS_ViT_seg)
                 # '3dresidual_unet': ResidualUNet3D,
                 # 'AMEA_deepvision': AMEA_deepvision_res2block,
                 # 'ResUnet3D': ResUnet3D}
