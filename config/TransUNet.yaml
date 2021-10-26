@@ -8,9 +8,11 @@ test_dir: '/data/jzw/data/LiTS/fixed_data'
 frame_num: 1
 
 ## continue train
+is_resume: False
 continue_train_timestamp: ''
 continue_train_epoch: 0
 pretrain_model: ''
+# is_resume: True
 # continue_train_timestamp: '2021-10-22-08-29-24'
 # continue_train_epoch: 64
 # pretrain_model: '/data/jzw/workspace/lits_3d/runs/lits_myself/unet3d/train/2021-10-22-08-29-24/checkpoints/epoch_64.pth'

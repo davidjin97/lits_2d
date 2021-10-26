@@ -82,30 +82,32 @@ class SegTrainer(object):
             self.net = build_net(self.opt.net_name)(**self.opt.model).to(self.opt.rank)
         # 这边可以添加summary，格式化网络 -- todo
 
-        if not self.opt.evaluate:
-            if self.opt.bn == 'sync':
-                try:
-                    import apex # not install yet
-                    self.net = apex.parallel.convert_syncbn_model(self.net)
-                except:
-                    logger.info('not install apex. thus no sync bn')
-            elif self.opt.bn == 'freeze':
-                self.net = self.net.apply(freeze_bn)
+        # if not self.opt.evaluate:
+        #     if self.opt.bn == 'sync':
+        #         try:
+        #             import apex # not install yet
+        #             self.net = apex.parallel.convert_syncbn_model(self.net)
+        #         except:
+        #             logger.info('not install apex. thus no sync bn')
+        #     elif self.opt.bn == 'freeze':
+        #         self.net = self.net.apply(freeze_bn)
 
         # 使用DDP       
         self.net = DDP(self.net,device_ids=[self.opt.rank])
 
         if self.opt.evaluate:
-            self.load_state_keywise(self.opt.resume_model)
-            logger.info('Load resume model from {}'.format(self.opt.resume_model))
-        elif self.opt.pretrain_model == '':
-            logger.info('Initial a new model...')
+            self.load_state_keywise(self.opt.eval_model)
+            logger.info('Load eval model from {}'.format(self.opt.eval_model))
+        elif not self.opt.is_resume:
+            logger.info('Initial a new model.')
         else:
-            if os.path.isfile(self.opt.pretrain_model):
-                self.load_state_keywise(self.opt.pretrain_model)
-                logger.info('Load pretrain model from {}'.format(self.opt.pretrain_model))
-            else:
-                logger.error('Can not find the specific model %s, initial a new model...', self.opt.pretrain_model)
+            logger.info('Wait to load resume model...')
+        # else:
+        #     if os.path.isfile(self.opt.pretrain_model):
+        #         self.load_state_keywise(self.opt.pretrain_model)
+        #         logger.info('Load pretrain model from {}'.format(self.opt.pretrain_model))
+        #     else:
+        #         logger.error('Can not find the specific model %s, initial a new model...', self.opt.pretrain_model)
 
 
         logger.info('Build model done.')
@@ -151,7 +153,7 @@ class SegTrainer(object):
 
             self.n_val_img = len(val_dataset)
             val_sampler = DistributedSampler(val_dataset)
-            self.val_loader = DataLoader(val_dataset, shuffle=False, num_workers=0, batch_size=1,
+            self.val_loader = DataLoader(val_dataset, shuffle=False, num_workers=0, batch_size=self.opt.batch_size,
                                             pin_memory=True, sampler=val_sampler)
             logger.info('val with {} pair images'.format(self.n_val_img))
         else:
@@ -210,6 +212,13 @@ class SegTrainer(object):
         else:
             logger.error('incorrect loss type {}'.format(self.opt.loss.type))
 
+    def _resume_train(self):
+        if os.path.isfile(self.opt.resume_model):
+            self.load_resume_dict(self.opt.resume_model)
+            logger.info(f'Load resume model from {self.opt.resume_model}')
+        else:
+            logger.error('Can not find the resumed model %s, initial a new model...', self.opt.resume_model)
+
     def train(self):
         self.net.train()
         if self.opt.rank == 0:
@@ -221,7 +230,7 @@ class SegTrainer(object):
         saved_trigger = 0
         saved_epoch = set()
 
-        for epoch in range(self.opt.train_epoch):
+        for epoch in range(self.opt.continue_train_epoch, self.opt.train_epoch):
             losses = AverageMeter()
             liver_dscs = AverageMeter()
             liver_mious = AverageMeter()
@@ -304,8 +313,6 @@ class SegTrainer(object):
                 self.writer.add_scalar(f'tumor_sens/train_epoch', tumor_sens.avg, epoch)
 
             logger.info(f'Start evalute at Epoch: {epoch+1}/{self.opt.train_epoch}')
-            # val_res = self.val(epoch)
-            self.val(epoch)
 
             saved_trigger += 1 
             if self.opt.rank == 0:
@@ -327,13 +334,18 @@ class SegTrainer(object):
                     saved_epoch.add(epoch)
                     self.save_checkpoint({'epoch': self.opt.train_epoch,
                                         'arch': self.opt.net_name,
-                                        'state_dict': self.net.state_dict(),
+                                        'optimizer': self.optimizer.state_dict(),
+                                        'lr_scheduler': self.lr_scheduler.state_dict(),
+                                        'model': self.net.state_dict(),
                                         }, f'epoch_{epoch+1}_model.pth')
                 
                 # if not self.opt.early_stop is None:
                 #     if saved_trigger >= self.opt.early_stop:
                 #         logger.info(f'Early stop at Epoch: {epoch+1}/{self.opt.train_epoch}')
                 #         break
+
+            self.val(epoch)
+
             logger.info(f'Finish Epoch: {epoch+1}/{self.opt.train_epoch}')
         logger.info(f"Finish training at {datetime.datetime.now()}, cost time: {(time.time()-train_start_time)/3600}h")
 
@@ -539,3 +551,31 @@ class SegTrainer(object):
         if 'state_dict' in resume_dict.keys():
             resume_dict = resume_dict['state_dict']
         self.net.load_state_dict(resume_dict)
+
+    def load_resume_dict(self, model_path):
+        map_location = {'cuda:%d' % 0: 'cuda:%d' % self.opt.rank}
+        resume_dict = torch.load(model_path, map_location=map_location)
+        ## resume model
+        if 'model' in resume_dict.keys():
+            model_dict = resume_dict['model']
+            self.net.load_state_dict(model_dict)
+        else:
+            logger.error(f"{model_path} dict has no keyword `model`") 
+        ### 兼容老版本代码
+        if 'state_dict' in resume_dict.keys():
+            model_dict = resume_dict['state_dict']
+            self.net.load_state_dict(model_dict)
+        else:
+            logger.error(f"{model_path} dict has no keyword `model`")
+        ## resume optimizer
+        if 'optimizer' in resume_dict.keys():
+            optimizer_dict = resume_dict['optimizer']
+            self.optimizer.load_state_dict(optimizer_dict)
+        else:
+            logger.error(f"{model_path} dict has no keyword `optimizer`") 
+        ## resume lr_scheduler
+        if 'lr_scheduler' in resume_dict.keys():
+            lr_scheduler_dict = resume_dict['lr_scheduler']
+            self.lr_scheduler.load_state_dict(lr_scheduler_dict)
+        else:
+            logger.error(f"{model_path} dict has no keyword `lr_scheduler_dict`") 
