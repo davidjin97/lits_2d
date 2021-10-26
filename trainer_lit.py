@@ -131,6 +131,8 @@ class SegTrainer(object):
             ## 加载 LitsMyself.Lits_DataSet
             if self.opt.debug:
                 train_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.train_dir, mode='debug') 
+            elif self.opt.minidata:
+                train_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.train_dir, mode='minitrain') 
             else:
                 train_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.train_dir, mode='train') 
 
@@ -148,6 +150,8 @@ class SegTrainer(object):
             ## 加载 LitsMyself.Lits_DataSet
             if self.opt.debug:
                 val_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.train_dir, mode='debug') 
+            elif self.opt.minidata:
+                val_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.train_dir, mode='minitest') 
             else:
                 val_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.train_dir, mode='test') 
 
@@ -166,14 +170,16 @@ class SegTrainer(object):
             # test_dataset = LitsTumorDataset(self.opt, test_img_paths)
             ## 加载 LitsMyself.Lits_DataSet
             if self.opt.debug:
-                test_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.train_dir, mode='debug') 
+                test_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.test_dir, mode='debug') 
+            elif self.opt.minidata:
+                test_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.test_dir, mode='minitest') 
             else:
-                test_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.train_dir, mode='test')             
+                test_dataset = Lits_DataSet(self.opt.frame_num, 1, self.opt.test_dir, mode='test') 
+
             self.n_test_img = len(test_dataset)
             test_sampler = DistributedSampler(test_dataset)
-            self.test_loader = DataLoader(test_dataset, shuffle=False, num_workers=0, batch_size=1,
+            self.test_loader = DataLoader(test_dataset, shuffle=False, num_workers=0, batch_size=self.opt.batch_size,
                                             pin_memory=True, sampler=test_sampler)
-
             logger.info('test with {} pair images'.format(self.n_test_img))
 
     def _build_optimizer(self):

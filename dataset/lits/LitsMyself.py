@@ -26,6 +26,10 @@ class Lits_DataSet(Dataset):
             self.filename_list = load_file_name_list(str(self.dataset_path / 'train_name_list.txt'))
         elif mode =='test':
             self.filename_list = load_file_name_list(str(self.dataset_path / 'val_name_list.txt'))
+        if mode=='minitrain':
+            self.filename_list = load_file_name_list(str(self.dataset_path / 'minitrain_name_list.txt'))
+        elif mode =='minitest':
+            self.filename_list = load_file_name_list(str(self.dataset_path / 'minival_name_list.txt'))
         elif mode =='debug':
             self.filename_list = load_file_name_list(str(self.dataset_path / 'debug_name_list.txt'))
         else:
@@ -186,8 +190,8 @@ class Lits_DataSet(Dataset):
 # 测试代码
     
 if __name__ == '__main__':
-    fixd_path  = '/home/jzw/data/LiTS/fixed_data'
-    dataset = Lits_DataSet(1, 1, fixd_path, mode='test')  #batch size
+    fixd_path  = '/data/jzw/data/LiTS/fixed_data'
+    dataset = Lits_DataSet(6, 1, fixd_path, mode='minitrain')  #batch size
     data_loader=DataLoader(dataset=dataset, batch_size=1, num_workers=1, shuffle=False)
     # for batch_idx, (data, target, fullImg) in enumerate(data_loader):
     for batch_idx, (data, target) in enumerate(data_loader):

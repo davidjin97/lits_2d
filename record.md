@@ -266,3 +266,10 @@ CUDA_VISIBLE_DEVICES=3 python main.py --config config/TransUNet.yaml --world_siz
 使用cuda:2 来train transunet
 CUDA_VISIBLE_DEVICES=2,3 python main.py --config config/TransUNet.yaml --world_size 2 --logname train_litsmyself_transunet_bcel.log
 nohup bash run.sh > train_litsmyself_transunet_bcel.out 2>&1 &
+
+# 1026
+做一个minitrain的数据集，使用10个volume train，3个volume test
+卡2 train litsMySelfMini + unet + bcel
+CUDA_VISIBLE_DEVICES=2 python main.py --config config/Unet.yaml --world_size 1 --logname train_litsMyselfMini_unet_bcel.log
+nohup bash run.sh > train_litsMyselfMini_unet_bcel.out 2>&1 &
+tensorboard --logdir runs/lits_myself_mini/unet/train/2021-10-26-10-30-11/summarys
