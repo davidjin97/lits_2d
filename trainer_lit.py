@@ -265,8 +265,8 @@ class SegTrainer(object):
 
                 loss = self.loss_function(output, mask)
 
-                liver_dsc, liver_miou, liver_acc, liver_ppv, liver_sen, liver_hd = get_metric(output.detach()[:, 0, :, :], mask.detach()[:, 0, :, :], self.opt.thr)
-                tumor_dsc, tumor_miou, tumor_acc, tumor_ppv, tumor_sen, tumor_hd = get_metric(output.detach()[:, 1, :, :], mask.detach()[:, 1, :, :], self.opt.thr)
+                liver_dsc, liver_miou, liver_acc, liver_ppv, liver_sen, liver_hd = get_metric(torch.sigmoid(output.detach()[:, 0, :, :]), mask.detach()[:, 0, :, :], self.opt.thr)
+                tumor_dsc, tumor_miou, tumor_acc, tumor_ppv, tumor_sen, tumor_hd = get_metric(torch.sigmoid(output.detach()[:, 1, :, :]), mask.detach()[:, 1, :, :], self.opt.thr)
                 # tumor_dsc, tumor_miou, tumor_acc, tumor_ppv, tumor_sen, tumor_hd = get_metric(torch.sigmoid(output.detach()[:, 0, :, :]), mask.detach()[:, 0, :, :], self.opt.thr)
 
                 losses.update(loss.item(), image.shape[0])
@@ -385,8 +385,8 @@ class SegTrainer(object):
 
                 loss = self.loss_function(output, mask)
 
-                liver_dsc, liver_miou, liver_acc, liver_ppv, liver_sen, liver_hd = get_metric(output.detach()[:, 0, :, :], mask.detach()[:, 0, :, :], self.opt.thr)
-                tumor_dsc, tumor_miou, tumor_acc, tumor_ppv, tumor_sen, tumor_hd = get_metric(output.detach()[:, 1, :, :], mask.detach()[:, 1, :, :], self.opt.thr)
+                liver_dsc, liver_miou, liver_acc, liver_ppv, liver_sen, liver_hd = get_metric(torch.sigmoid(output.detach()[:, 0, :, :]), mask.detach()[:, 0, :, :], self.opt.thr)
+                tumor_dsc, tumor_miou, tumor_acc, tumor_ppv, tumor_sen, tumor_hd = get_metric(torch.sigmoid(output.detach()[:, 1, :, :]), mask.detach()[:, 1, :, :], self.opt.thr)
                 # tumor_dsc, tumor_miou, tumor_acc, tumor_ppv, tumor_sen, tumor_hd = get_metric(torch.sigmoid(output.detach()[:, 0, :, :]), mask.detach()[:, 0, :, :], self.opt.thr)
 
                 losses.update(loss.item(), image.shape[0])
