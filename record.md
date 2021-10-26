@@ -260,3 +260,9 @@ nohup bash run.sh > train_litsmyself_unet_bcel.out 2>&1 &
 
 ## train trasunet
 CUDA_VISIBLE_DEVICES=3 python main.py --config config/TransUNet.yaml --world_size 1 --logname train_litsmyself_unet_bcel.log
+
+# 1025
+从csffm2分流至3090
+使用cuda:2 来train transunet
+CUDA_VISIBLE_DEVICES=2,3 python main.py --config config/TransUNet.yaml --world_size 2 --logname train_litsmyself_transunet_bcel.log
+nohup bash run.sh > train_litsmyself_transunet_bcel.out 2>&1 &

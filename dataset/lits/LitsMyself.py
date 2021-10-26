@@ -1,7 +1,7 @@
 import sys
 from glob import glob
 import logging
-sys.path.append("/home/jzw/workspace_seg/template_seg_jzw/dataset/lits")
+sys.path.append("/home/jzw/workspace/lits_2d/dataset/lits")
 from utils.common import *
 from scipy import ndimage
 import numpy as np
