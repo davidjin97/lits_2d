@@ -7,7 +7,7 @@ import copy
 import logging
 import math
 import sys
-sys.path.append("/home/jzw/workspace_seg/template_seg_jzw/networks/TransUNet")
+sys.path.append("/home/jzw/workspace/lits_2d/networks/TransUNet")
 
 from os.path import join as pjoin
 

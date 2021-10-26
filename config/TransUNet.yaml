@@ -1,15 +1,23 @@
 net_name: 'TransUNet'
-train_dir: '/home/jzw/data/LiTS/fixed_data' # '/home/jzw/data/LiTS/fixed_data/'
-# train_list: '/home/jzw/workspace_seg/template_jzw/datatxt/LitsSeg_train.txt'
-test_dir: '/home/jzw/data/LiTS/fixed_data'
-# test_list: '/home/jzw/workspace_seg/template_jzw/datatxt/LitsSeg_test.txt'
+train_dir: '/data/jzw/data/LiTS/fixed_data' # '/home/jzw/data/LiTS/fixed_data/'
+# train_list: '/data/jzw/workspace_seg/template_jzw/datatxt/LitsSeg_train.txt'
+test_dir: '/data/jzw/data/LiTS/fixed_data'
+# test_list: '/data/jzw/workspace_seg/template_jzw/datatxt/LitsSeg_test.txt'
 ## depth in CT 
 # depth: 24
 frame_num: 1
 
-pretrain_model: '' # /home/xzy/projects/BrainSeg/checkpoints/BrainSeg/Unet3D/epoch_85_model_final.pth
-pretrain_epoch: 0 # 9
+## continue train
+continue_train_timestamp: ''
+continue_train_epoch: 0
+pretrain_model: ''
+# continue_train_timestamp: '2021-10-22-08-29-24'
+# continue_train_epoch: 64
+# pretrain_model: '/data/jzw/workspace/lits_3d/runs/lits_myself/unet3d/train/2021-10-22-08-29-24/checkpoints/epoch_64.pth'
+
+## evaluate model
 resume_model: '' #'runs/lits_seg/unet/train/2021-09-16-22-20-37/checkpoints/epoch_100_model_best_loss.pth'
+
 input_height: 224
 input_width: 224
 
